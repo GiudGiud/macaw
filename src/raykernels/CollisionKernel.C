@@ -142,6 +142,9 @@ CollisionKernel::onSegment()
   // Reset the OpenMC particle status
   p->alive() = true;
 
+  // Set particle number of events
+  p->n_event() = currentRay()->auxData(8);
+
   // Compute all cross sections
   p->event_calculate_xs();
 
@@ -215,6 +218,9 @@ CollisionKernel::onSegment()
 
     // Keep track of particle number of progeny
     currentRay()->auxData(2) = p->n_progeny();
+
+    // Keep track of particle number of events
+    currentRay()->auxData(8) = p->n_event();
 
     // Keep track of the particle seed for consistent random number generation
     currentRay()->auxData(4) = p->seeds(0);

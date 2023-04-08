@@ -213,7 +213,7 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
   registerRayAuxData("seed_source");
   registerRayAuxData("seed_URR");
   registerRayAuxData("particle_type");
-  // registerRayAuxData("n_event");
+  registerRayAuxData("n_event"); // avoid max_event on threaded particles in kernel
 
   // Set the number of steps of the Transient executioner as the number of batches
   if (dynamic_cast<Transient *>(_app.getExecutioner()))
