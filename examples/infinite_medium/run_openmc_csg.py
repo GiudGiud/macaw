@@ -6,10 +6,11 @@ import openmc
 import os
 
 # Strong scaling study
-# Increase the number of processors, keep the load (neutrons, domain size) the same
+# Increase the number of processors, keep the problem (neutrons, domain size) the same
 
 mode = 'openmp'
 mode = 'mpi'
+scaling = 'strong'
 
 num_procs = [1, 2, 4, 8, 16, 28, 32, 40, 50, 56, 64, 80, 112]
 timings = [[], []]
@@ -21,8 +22,12 @@ n_neutrons = int(1e2)
 
 for num_proc in num_procs:
 
-    width = np.sqrt(num_proc)
-    neutrons = num_proc * n_neutrons
+    if scaling == 'strong':
+        box_size = 10
+        neutrons = n_neutrons
+    if scaling == 'weak':
+        box_size = 1.25984 * np.sqrt(num_proc)
+        neutrons = num_proc * n_neutrons
 
     ###############################################################################
     # Create materials for the problem
@@ -44,7 +49,7 @@ for num_proc in num_procs:
     # Define problem geometry
 
     # Create a region represented as the inside of a rectangular prism
-    pitch = 1.25984 * width
+    pitch = box_size
     box = openmc.rectangular_prism(pitch, pitch, boundary_type='reflective')
 
     # Create cells, mapping materials to regions

@@ -1,25 +1,22 @@
+# Large box size means less intersections, maximizing speed
+box_size = 100
+# Number of elements must be above number of MPI ranks to have
+# decent partitioning
+
 [Mesh]
   [gmg]
     type = GeneratedMeshGenerator
     dim = 3
-    nx = 5
-    ny = 5
-    nz = 5
-    xmin = -5
-    ymin = -5
-    zmin = -5
-    xmax = 5
-    ymax = 5
-    zmax = 5
+    nx = 1
+    ny = 1
+    nz = 1
+    xmin = ${fparse -box_size / 2}
+    ymin = ${fparse -box_size / 2}
+    zmin = ${fparse -box_size / 2}
+    xmax = ${fparse box_size / 2}
+    ymax = ${fparse box_size / 2}
+    zmax = ${fparse box_size / 2}
   []
-  [./add_subdomain]
-    input = gmg
-    type = SubdomainBoundingBoxGenerator
-    top_right = '1 1 1'
-    bottom_left = '-1 -1 -1'
-    block_id = 1
-    block_name = 'center'
-  [../]
 []
 
 [Problem]
@@ -28,7 +25,7 @@
 []
 
 # Main things we care about for the coupling
-[Variables/temperature]
+[AuxVariables/temperature]
   order = CONSTANT
   family = MONOMIAL
   initial_condition = 300
@@ -43,11 +40,6 @@
   blocks = "0 1 2"
   materials = "1 1 1" # openmc material id
   # verbose = true
-[]
-[RayKernels/u_integral]
-  type = VariableIntegralRayKernel
-  variable = temperature
-  # rays = 'diag right_up'
 []
 
 [RayBCs]
@@ -69,6 +61,9 @@
   # Needed to cache Ray data for RayTracingMeshOutput
   data_on_cache_traces = false
   aux_data_on_cache_traces = false
+
+  # Dont kill simulation on ray tracing failure
+  tolerate_failure = true
 []
 
 [Executioner]
@@ -78,6 +73,11 @@
 [Outputs]
   exodus = false
   csv = true
+  [console]
+    type = Console
+    interval = 10
+    hide = 'total_num_rays max_proc_m'
+  []
 []
 
 # To look at domain decomposition
@@ -97,12 +97,12 @@
     type = MemoryUsage
     execute_on = 'INITIAL TIMESTEP_END'
   []
-  [per_proc]
+  [proc_mem]
     type = MemoryUsage
     value_type = "average"
     execute_on = 'INITIAL TIMESTEP_END'
   []
-  [max_proc]
+  [max_proc_m]
     type = MemoryUsage
     value_type = "max_process"
     execute_on = 'INITIAL TIMESTEP_END'
@@ -130,10 +130,15 @@
     type = CumulativeValuePostprocessor
     postprocessor = num_rays
   []
-  [neutrons_per_s]
+  [neutrons_per_s_tot]
     type = ParsedPostprocessor
     pp_names = 'total_num_rays total_time'
     function = 'total_num_rays / total_time'
+  []
+  [neutrons_per_s_last]
+    type = ParsedPostprocessor
+    pp_names = 'num_rays run_time'
+    function = 'num_rays / run_time'
   []
 []
 
@@ -141,4 +146,5 @@
   type = PerProcessorRayTracingResultsVectorPostprocessor
   execute_on = TIMESTEP_END
   study = study
+  outputs = none
 []
