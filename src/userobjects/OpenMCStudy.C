@@ -195,6 +195,7 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
   registerRayAuxData("seed_source");
   registerRayAuxData("seed_URR");
   registerRayAuxData("particle_type");
+  // registerRayAuxData("n_event");
 
   // Set the number of steps of the Transient executioner as the number of batches
   if (dynamic_cast<Transient *>(_app.getExecutioner()))
@@ -266,7 +267,6 @@ void
 OpenMCStudy::claimRaysInternal()
 {
   TIME_SECTION(_claim_rays_timer);
-  CONSOLE_TIMED_PRINT("Claiming rays");
 
   _claim_rays.claim();
 }
@@ -276,7 +276,6 @@ OpenMCStudy::defineRaysInternal()
 {
   {
     TIME_SECTION(_define_rays_timer);
-    CONSOLE_TIMED_PRINT("Defining rays");
 
     _rays.clear();
     _local_rays.clear();
@@ -361,6 +360,8 @@ OpenMCStudy::defineRays()
 
     _rays.emplace_back(std::move(ray));
   }
+  if (_verbose)
+    _console << "Rays prepared " << _rays.size() << std::endl;
 }
 
 void
@@ -382,9 +383,9 @@ OpenMCStudy::postExecuteStudy()
     openmc::finalize_generation();
   else
   {
-    // For domain decomposed Monte Carlo, we cannot sort sites using OpenMC's sort_fission_bank
-    // and we cannot synchronize the bank using OpenMC's synchronize_bank because some domains
-    // may have sampled 0 sites
+    // For domain decomposed Monte Carlo:
+    // we cannot synchronize the bank using OpenMC's synchronize_bank because some domains
+    // may have sampled 0 sites (no fissile material in domain for example)
     finalizeGeneration();
   }
 
@@ -398,7 +399,7 @@ OpenMCStudy::postExecuteStudy()
   // Output k-effective since OpenMC output is silenced
   _console << "Keff " << openmc::simulation::keff << " (" << openmc::simulation::keff_std
            << ") Generation: "
-           << openmc::simulation::keff_generation / openmc::settings::n_particles;
+           << openmc::simulation::keff_generation / openmc::settings::n_particles << std::endl;
 }
 
 void
@@ -429,8 +430,11 @@ OpenMCStudy::finalizeGeneration()
 
   if (openmc::settings::run_mode == openmc::RunMode::EIGENVALUE)
   {
-
-    // TODO Sort bank
+    // Sort fission bank to get consistent exchanges between MPI ranks
+    // This prevents from attempting to sort with no sampled particles
+    if (openmc::simulation::fission_bank.size() == 0)
+      openmc::simulation::progeny_per_particle.clear();
+    openmc::sort_fission_bank();
 
     // Synchronize all fission banks to keep the same number of starting rays every batch
     synchronizeBanks();
@@ -445,9 +449,7 @@ OpenMCStudy::finalizeGeneration()
 
     // Write generation output
     if (comm().rank() == 0 && openmc::settings::verbosity >= 7)
-    {
       openmc::print_generation();
-    }
   }
 }
 
@@ -486,13 +488,9 @@ OpenMCStudy::synchronizeBanks()
 
   int64_t sites_needed;
   if (total < openmc::settings::n_particles)
-  {
     sites_needed = openmc::settings::n_particles % total;
-  }
   else
-  {
     sites_needed = openmc::settings::n_particles;
-  }
   double p_sample = static_cast<double>(sites_needed) / total;
 
   if (_verbose)
@@ -602,7 +600,12 @@ OpenMCStudy::synchronizeBanks()
   _source_bank_size = index_temp;
   if (index_temp < 0)
     mooseError("Source bank has negative size ", _source_bank_size);
-
+  if (index_temp > 2 * openmc::simulation::work_per_rank ||
+      index_temp * 2 < openmc::simulation::work_per_rank)
+    mooseDoOnce(mooseWarning("Large imbalance detected on process " +
+                             std::to_string(processor_id()) + " : we expected around " +
+                             std::to_string(openmc::simulation::work_per_rank) + " and got " +
+                             std::to_string(index_temp) + " particles"));
   /* End adapted from OpenMC */
 }
 
