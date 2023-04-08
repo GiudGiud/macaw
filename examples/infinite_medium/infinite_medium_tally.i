@@ -1,5 +1,5 @@
 # Large box size means less intersections, maximizing speed
-box_size = 100
+box_size = 10
 # Number of elements must be above number of MPI ranks to have
 # decent partitioning
 
@@ -24,14 +24,14 @@ box_size = 100
   kernel_coverage_check = false
 []
 
+##############################################################################
+# Problem definition
+
 # Main things we care about for the coupling
 [AuxVariables/temperature]
   order = CONSTANT
   family = MONOMIAL
   initial_condition = 300
-[]
-
-[AuxVariables/power]
 []
 
 [RayKernels/collision]
@@ -70,8 +70,11 @@ box_size = 100
   type = Transient
 []
 
+##############################################################################
+# Outputs
+
 [Outputs]
-  exodus = false
+  exodus = true
   csv = true
   [console]
     type = Console
@@ -91,7 +94,9 @@ box_size = 100
   []
 []
 
-# To measure performance
+##############################################################################
+# Performance analysis
+
 [Postprocessors]
   [total_mem]
     type = MemoryUsage
@@ -147,4 +152,45 @@ box_size = 100
   execute_on = TIMESTEP_END
   study = study
   outputs = none
+[]
+
+##############################################################################
+# Tallies
+
+[UserObjects]
+  [tally]
+    type = OpenMCTally
+    particle_type = 'neutron'
+    estimator = 'COLLISION'
+    scores = 'kappa-fission'
+    filters = 'cell'
+    execute_on = 'initial'
+    id = 1
+  []
+[]
+
+[AuxKernels]
+  [cell_val]
+    type = OpenMCTallyAux
+    granularity = 'cell'
+    score = 'kappa-fission'
+    tally_id = 1
+    execute_on = TIMESTEP_END
+    variable = power
+  []
+[]
+
+[AuxVariables]
+  [power]
+    order = CONSTANT
+    family = MONOMIAL
+  []
+[]
+
+# Examine deviation
+[Postprocessors]
+  [average_power]
+    type = ElementAverageValue
+    variable = power
+  []
 []
