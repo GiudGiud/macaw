@@ -72,6 +72,9 @@ OpenMCStudy::validParams()
   // Subdomain setup does not depend on individual Rays in Monte Carlo
   params.addPrivateParam<bool>("_ray_dependent_subdomain_setup", false);
 
+  // no need to kill the simulation on ray tracing failures
+  params.addParam<bool>("tolerate_failure", false, "Whether to stop on ray tracing failures");
+
   return params;
 }
 
@@ -252,9 +255,9 @@ OpenMCStudy::generateRays()
   const auto num_local = _local_rays.size();
   if ((unsigned long)num_local > openmc::simulation::progeny_per_particle.size())
     openmc::simulation::progeny_per_particle.resize(num_local);
-  if ((long long)num_local * 3 > openmc::simulation::fission_bank.size())
+  if ((long long)num_local * 3 > openmc::simulation::fission_bank.capacity())
   {
-    _console << "Resizing fission bank post claiming: " << 3 * num_local << std::endl;
+    _console << "Expanding fission bank post claiming: " << 3 * num_local << std::endl;
     openmc::simulation::fission_bank.reserve(3 * num_local);
   }
 
@@ -424,7 +427,6 @@ OpenMCStudy::postExecuteStudy()
     openmc::finalize_generation();
   else
   {
-    _console << "P " << processor_id() << " : " << openmc::simulation::fission_bank.size() << std::endl;
     // For domain decomposed Monte Carlo:
     // we cannot synchronize the bank using OpenMC's synchronize_bank because some domains
     // may have sampled 0 sites (no fissile material in domain for example)
@@ -476,9 +478,10 @@ OpenMCStudy::finalizeGeneration()
     // This prevents from attempting to sort with no sampled particles
     if (openmc::simulation::fission_bank.size() == 0)
       openmc::simulation::progeny_per_particle.clear();
-    for (auto i = 0; i< openmc::simulation::progeny_per_particle.size(); i++)
-      std::cout << i << " " << openmc::simulation::progeny_per_particle[i] << std::endl;
-    openmc::sort_fission_bank();
+
+    // openmc::sort_fission_bank();
+    // sorting wont work: progeny_id on sites are 0-n_progeny for a particle, but particles,
+    // since they overlap in id, are storing sum_progeny in progeny_per_particle
 
     // Synchronize all fission banks to keep the same number of starting rays every batch
     synchronizeBanks();
