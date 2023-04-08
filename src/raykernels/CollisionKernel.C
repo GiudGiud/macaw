@@ -19,6 +19,9 @@
 #include "openmc/simulation.h"
 #include "openmc/tallies/tally.h"
 
+// Extra includes for debugging
+#include "openmc/bank.h"
+
 registerMooseObject("MaCawApp", CollisionKernel);
 
 InputParameters
@@ -226,7 +229,11 @@ CollisionKernel::onSegment()
     if (p->event() == openmc::TallyEvent::KILL || p->event() == openmc::TallyEvent::ABSORB)
     {
       currentRay()->setShouldContinue(false);
+      const auto current_progeny = openmc::simulation::progeny_per_particle[p->id() - 1];
       p->event_death();
+
+      // Particles are sharing ids, can't overwrite the progeny number
+      openmc::simulation::progeny_per_particle[p->id() - 1] += current_progeny;
     }
 
     // Handle secondary particles immediately after they are sampled, as the particle

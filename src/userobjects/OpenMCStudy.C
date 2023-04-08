@@ -160,6 +160,9 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
   openmc::model::universes.resize(_mesh.getMesh().n_subdomains());
   openmc::model::universe_map.clear();
 
+  if (mesh().getMesh().n_active_elem() == 0)
+    mooseWarning("A subdomain has zero elements! Watch out for the corner case");
+
   int i = -1;
   for (const auto & elem : *mesh().getActiveLocalElementRange())
   {
@@ -185,6 +188,21 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
     else
       openmc::model::universes[it->second]->cells_.push_back(elem_id);
   }
+
+  if (_verbose)
+  {
+    _console << "Estimated particles per rank " << openmc::simulation::work_per_rank << std::endl;
+    _console << "Universes/Blocks on rank " << processor_id() << " "
+             << openmc::model::universes.size() << std::endl;
+  }
+
+  // This is used to index into arrays with [particle_id - work_index]
+  // This could be higher than the particle id, coming from another rank!
+  // If we drop this: need to sort differently and need to stop calling event_death
+  for (auto i = 0; i < openmc::simulation::work_index.size(); i++)
+    openmc::simulation::work_index[i] = 0;
+  if (comm().size() > 1 && libMesh::n_threads() > 1)
+    mooseError("Hybrid parallelism not supported, particle ids overlap between ranks");
 
   // TODO Initialize this nicer
   registerRayAuxData("energy");
@@ -228,6 +246,22 @@ OpenMCStudy::generateRays()
   // Assign rays to each process. This is done every time since particles keep
   // changing domains. If we do fixed source, we can limit this
   claimRaysInternal();
+
+  // Local OpenMC arrays are sized for an equal share, but claiming could trigger
+  // a load imbalance
+  const auto num_local = _local_rays.size();
+  if ((unsigned long)num_local > openmc::simulation::progeny_per_particle.size())
+    openmc::simulation::progeny_per_particle.resize(num_local);
+  if ((long long)num_local * 3 > openmc::simulation::fission_bank.size())
+  {
+    _console << "Resizing fission bank post claiming: " << 3 * num_local << std::endl;
+    openmc::simulation::fission_bank.reserve(3 * num_local);
+  }
+
+  // Reset progeny numbers
+  std::fill(openmc::simulation::progeny_per_particle.begin(),
+            openmc::simulation::progeny_per_particle.end(),
+            0);
 
   //TODO Reinit the elements for the physics
 
@@ -338,6 +372,7 @@ OpenMCStudy::defineRays()
     ray->auxData(2) = 0;
 
     // Keep track of openmc particle id
+    // particle id is rank_start_id + local_id
     ray->auxData(3) = p.id();
 
     // Keep track of the particle seed for consistent random number generation
@@ -353,6 +388,12 @@ OpenMCStudy::defineRays()
     Point direction(p.u()[0], p.u()[1], p.u()[2]);
     if (_is_2D)
       direction(2) = 0;
+
+    if (MooseUtils::absoluteFuzzyEqual(p.u()[0], 0) &&
+        MooseUtils::absoluteFuzzyEqual(p.u()[1], 0) && MooseUtils::absoluteFuzzyEqual(p.u()[2], 0))
+      _console << "Particle " << i
+               << " is sampled with 0 direction : " << openmc::simulation::source_bank[i].parent_id
+               << openmc::simulation::source_bank[i].progeny_id << std::endl;
 
     // Claimer will locate the starting point
     ray->setStart(start);
@@ -383,6 +424,7 @@ OpenMCStudy::postExecuteStudy()
     openmc::finalize_generation();
   else
   {
+    _console << "P " << processor_id() << " : " << openmc::simulation::fission_bank.size() << std::endl;
     // For domain decomposed Monte Carlo:
     // we cannot synchronize the bank using OpenMC's synchronize_bank because some domains
     // may have sampled 0 sites (no fissile material in domain for example)
@@ -434,6 +476,8 @@ OpenMCStudy::finalizeGeneration()
     // This prevents from attempting to sort with no sampled particles
     if (openmc::simulation::fission_bank.size() == 0)
       openmc::simulation::progeny_per_particle.clear();
+    for (auto i = 0; i< openmc::simulation::progeny_per_particle.size(); i++)
+      std::cout << i << " " << openmc::simulation::progeny_per_particle[i] << std::endl;
     openmc::sort_fission_bank();
 
     // Synchronize all fission banks to keep the same number of starting rays every batch
@@ -466,6 +510,7 @@ OpenMCStudy::synchronizeBanks()
   // Compute total number of fission sites sampled
   int64_t start = 0;
   int64_t n_bank = openmc::simulation::fission_bank.size();
+  _console << "size of local fission bank " << n_bank << std::endl;
   MPI_Exscan(&n_bank, &start, 1, MPI_INT64_T, MPI_SUM, comm().get());
 
   // While we would expect the value of start on rank 0 to be 0, the MPI
@@ -596,6 +641,8 @@ OpenMCStudy::synchronizeBanks()
   std::copy(
       temp_sites.begin(), temp_sites.begin() + index_temp, openmc::simulation::source_bank.begin());
 
+  /* End adapted from OpenMC */
+
   // Keep track of source bank size
   _source_bank_size = index_temp;
   if (index_temp < 0)
@@ -605,8 +652,9 @@ OpenMCStudy::synchronizeBanks()
     mooseDoOnce(mooseWarning("Large imbalance detected on process " +
                              std::to_string(processor_id()) + " : we expected around " +
                              std::to_string(openmc::simulation::work_per_rank) + " and got " +
-                             std::to_string(index_temp) + " particles"));
-  /* End adapted from OpenMC */
+                             std::to_string(index_temp) + " particles."));
+  if (index_temp == 0)
+    mooseWarning("Are there fissile regions on every rank?");
 }
 
 void
