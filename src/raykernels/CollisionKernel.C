@@ -233,7 +233,11 @@ CollisionKernel::onSegment()
     // could change domain, and rays cannot be created in a different domain
     p->alive() = false;
     p->event_revive_from_secondary();
-    if (false && p->n_event() == 0)
+
+    // A secondary particle has been sampled
+    // TODO: allow all particles, not just neutrons
+    // TODO: handle multiple secondary particles
+    if (p->n_event() == 0 && p->type() == openmc::ParticleType::neutron)
     {
       // Create a new Ray with starting information
       Point start(p->r()[0], p->r()[1], p->r()[2]);
@@ -245,7 +249,7 @@ CollisionKernel::onSegment()
       }
       std::shared_ptr<Ray> ray = acquireRay(start, direction);
 
-      if (_verbose)
+      if (true)
         _console << "Sampled secondary particle type " << int(p->type()) << ", creating new ray "
                  << ray->id() << " at " << p->r() << " " << p->E() << "eV " << std::endl;
 
@@ -258,6 +262,8 @@ CollisionKernel::onSegment()
 
       // Need to generate a new particle id
       // FIXME This is not deterministic
+      // Particle id is used in event_death to track the number
+      // of progeny per particle, then used for sorting the fission source
       openmc::Particle p2;
       ray->auxData(3) = p2.id();
 
