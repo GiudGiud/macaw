@@ -74,6 +74,10 @@ OpenMCTallyAux::OpenMCTallyAux(const InputParameters & params)
 {
   // if (_estimator != openmc::model::tallies[openmc::model::tally_map[_tally_id]]->estimator_)
   //   paramError("estimator", "estimator does not match the estimator of given tally");
+
+  // No support for FETs right now
+  if (mooseVariableBase()->feType() != FEType(CONSTANT, MONOMIAL))
+    paramError("variable", "must be of type CONSTANT MONOMIAL, FETs are not supported");
 }
 
 double
@@ -159,7 +163,11 @@ OpenMCTallyAux::computeValue()
         // If the local cell is not in the tally cell filter, tally value is 0
         if (find(cell_filter->cells().begin(), cell_filter->cells().end(), _current_elem->id()) ==
             cell_filter->cells().end())
+        {
+          mooseInfo("Outputting cell-tally " + std::to_string(_tally_id) +
+                    " outside of its domain of definition");
           return 0;
+        }
 
         // Get cell bin, only 1 coordinate level in MaCaw
         openmc::Particle p;
