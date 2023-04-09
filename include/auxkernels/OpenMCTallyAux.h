@@ -54,4 +54,10 @@ protected:
 
   /// Energy bin to retrieve tally value from
   int _energy_bin;
+
+  /// Whether to normalize by the number of particles
+  const bool _norm_by_particles;
+
+  /// Normalization factor, to get to the desired power
+  const Real & _norm_factor;
 };

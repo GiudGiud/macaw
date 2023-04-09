@@ -13,6 +13,8 @@
 #include "openmc/tallies/filter_cell.h"
 #include "openmc/nuclide.h"
 #include "openmc/reaction.h"
+#include "openmc/simulation.h"
+#include "openmc/settings.h"
 
 #include <xtensor/xarray.hpp>
 #include <xtensor/xfixed.hpp>
@@ -34,6 +36,7 @@ OpenMCTallyAux::validParams()
   MooseEnum estimator_types("ANALOG TRACKLENGTH COLLISION", "COLLISION");
   MooseEnum particle_types("neutron photon electron positron", "neutron");
 
+  // TODO Pass the tally user object: would only be from MOOSE though
   params.addParam<int>("tally_id", "Tally id used to access tally");
   params.addRequiredParam<MooseEnum>(
       "granularity", granularity_types, "Scope of the tally value to retrieve");
@@ -43,6 +46,10 @@ OpenMCTallyAux::validParams()
   params.addRequiredParam<MooseEnum>("particle_type", particle_types, "Particle type of the tally");
   params.addParam<std::string>("nuclide", "Nuclide to get tally value for");
   params.addParam<int>("energy_bin", "Energy_bin to get tally value for");
+
+  params.addParam<bool>(
+      "normalize_by_particles", true, "Whether to normalize by total number of particles");
+  params.addParam<Real>("normalization", 1, "Normalization factor (in addition to particles)");
 
   // TODO: Add all filters and scores to retrieve in the right bin
   // TODO: Add option to compute std deviation
@@ -61,7 +68,9 @@ OpenMCTallyAux::OpenMCTallyAux(const InputParameters & params)
     _all_nuclides(!isParamValid("nuclide")),
     _nuclide(isParamValid("nuclide") ? getParam<std::string>("nuclide") : "all"),
     _all_energies(!isParamValid("energy_bin")),
-    _energy_bin(isParamValid("energy_bin") ? getParam<int>("energy_bin") : -1)
+    _energy_bin(isParamValid("energy_bin") ? getParam<int>("energy_bin") : -1),
+    _norm_by_particles(getParam<bool>("normalize_by_particles")),
+    _norm_factor(getParam<Real>("normalization"))
 {
   // if (_estimator != openmc::model::tallies[openmc::model::tally_map[_tally_id]]->estimator_)
   //   paramError("estimator", "estimator does not match the estimator of given tally");
@@ -84,6 +93,8 @@ OpenMCTallyAux::computeValue()
   int cell_bin;
   bool has_cell_filter = false;
   bool has_univ_filter = false;
+
+  // Large parts of this code have been adapted from OpenMC
 
   if (_retrieve_from_tally_id)
   {
@@ -205,7 +216,12 @@ OpenMCTallyAux::computeValue()
         break;
     }
 
-    return val[0];
+    Real tally_return = val[0];
+    if (_norm_by_particles && openmc::simulation::current_batch > openmc::settings::n_inactive)
+      tally_return /= openmc::settings::n_particles *
+                      (openmc::simulation::current_batch - openmc::settings::n_inactive);
+
+    return tally_return / _norm_factor;
   }
   else
   {
