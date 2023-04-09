@@ -163,11 +163,9 @@ OpenMCTally::initialize()
       vector<int> cell_ids;
       if (!isParamValid("cell_bins"))
         for (size_t i = 0; i < model::cells.size(); ++i)
-          cell_ids.push_back(i);
+          cell_ids.push_back(model::cells[i]->id_);
       else
         cell_ids = _cell_bins;
-      _console << "P " << processor_id() << " : " << model::cells.size() << " ("
-               << !isParamValid("cell_bins") << ") " << std::endl;
       cell_filter->set_cells(cell_ids);
     }
     else

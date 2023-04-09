@@ -53,6 +53,7 @@ OpenMCTallyAux::validParams()
 
   // TODO: Add all filters and scores to retrieve in the right bin
   // TODO: Add option to compute std deviation
+  // TODO: Add support for multiple bins for partial sums
 
   return params;
 }
@@ -99,6 +100,7 @@ OpenMCTallyAux::computeValue()
   bool has_univ_filter = false;
 
   // Large parts of this code have been adapted from OpenMC
+  // (or Cardinal? Check with Robert)
 
   if (_retrieve_from_tally_id)
   {
@@ -145,9 +147,7 @@ OpenMCTallyAux::computeValue()
       else if (openmc::model::tally_filters[i_filt]->type() == "energy")
       {
         if (_all_energies)
-        {
           energy_end = openmc::model::tally_filters[i_filt]->n_bins();
-        }
         else
         {
           energy_start = _energy_bin;
@@ -164,8 +164,8 @@ OpenMCTallyAux::computeValue()
         if (find(cell_filter->cells().begin(), cell_filter->cells().end(), _current_elem->id()) ==
             cell_filter->cells().end())
         {
-          mooseInfo("Outputting cell-tally " + std::to_string(_tally_id) +
-                    " outside of its domain of definition");
+          mooseWarning("Outputting cell-tally " + std::to_string(_tally_id) +
+                       " outside of its domain of definition");
           return 0;
         }
 
@@ -199,7 +199,8 @@ OpenMCTallyAux::computeValue()
         for (int j = energy_start; j < energy_end; ++j)
         {
           filter_index = _current_elem->subdomain_id() * univ_stride + j * energy_stride;
-          val += xt::view(t->results_, filter_index, score_index, 1);
+          val += xt::view(
+              t->results_, filter_index, score_index, static_cast<int>(openmc::TallyResult::SUM));
         }
 
         break;
@@ -207,7 +208,7 @@ OpenMCTallyAux::computeValue()
 
         // TODO: add the case where all nuclides need to be summed
         // TODO: add case where not all cells are in cell filters
-        // can't index by element->id() anymore
+        //       can't index by element->id() anymore
 
         if (!has_cell_filter)
           mooseError("Specified tally does not contain a cell filter");
@@ -217,18 +218,21 @@ OpenMCTallyAux::computeValue()
           for (int j = energy_start; j < energy_end; ++j)
           {
             filter_index = i * univ_stride + cell_bin * cell_stride + j * energy_stride;
-            val += xt::view(t->results_, filter_index, score_index, 1);
+            val += xt::view(
+                t->results_, filter_index, score_index, static_cast<int>(openmc::TallyResult::SUM));
+            // value got reset to 0 during accumulation
           }
         }
 
         break;
     }
 
+    // Normalize tallies, which are sums over multiple generations/batches
     Real tally_return = val[0];
+    mooseAssert(val.size() == 1, "Tally should have been narrowed to only one bin");
     if (_norm_by_particles && openmc::simulation::current_batch > openmc::settings::n_inactive)
       tally_return /= openmc::settings::n_particles *
                       (openmc::simulation::current_batch - openmc::settings::n_inactive);
-
     return tally_return / _norm_factor;
   }
   else
