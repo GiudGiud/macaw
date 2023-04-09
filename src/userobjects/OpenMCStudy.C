@@ -433,17 +433,25 @@ OpenMCStudy::postExecuteStudy()
     finalizeGeneration();
   }
 
-  // Stop openmc from reducing tallies (arrays are not the same size)
+  // Stop openmc from reducing tallies across ranks (arrays are not the same size)
   openmc::mpi::n_procs = 1;
+  // Still force accumulation into sum
+  openmc::mpi::master = true;
 
   // Reduce all tallies, write state/source_point, run CMFD
   openmc::finalize_batch();
   openmc::mpi::n_procs = comm().size();
+  openmc::mpi::master = processor_id() == 0;
+
+  // TODO
+  // Check that keff is reduced across all ranks properly
 
   // Output k-effective since OpenMC output is silenced
   _console << "Keff " << openmc::simulation::keff << " (" << openmc::simulation::keff_std
            << ") Generation: "
-           << openmc::simulation::keff_generation / openmc::settings::n_particles << std::endl;
+           << openmc::simulation::keff_generation / openmc::settings::n_particles *
+                  openmc::mpi::n_procs
+           << std::endl;
 }
 
 void
