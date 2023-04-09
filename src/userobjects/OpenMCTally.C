@@ -59,7 +59,7 @@ OpenMCTally::validParams()
   // TODO Add Functional Expansion filters
 
   // TODO : Try not to use that, user should not input the id of a tally. What if it s the same
-  // as an exisiting one?
+  // as an existing one?
   params.addRequiredParam<int>("id", "Tally id used to extract tally from an auxkernel");
 
   return params;
@@ -166,7 +166,8 @@ OpenMCTally::initialize()
           cell_ids.push_back(i);
       else
         cell_ids = _cell_bins;
-
+      _console << "P " << processor_id() << " : " << model::cells.size() << " ("
+               << !isParamValid("cell_bins") << ") " << std::endl;
       cell_filter->set_cells(cell_ids);
     }
     else
