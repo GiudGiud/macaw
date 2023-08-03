@@ -34,8 +34,8 @@ CollisionKernel::validParams()
                              "Contributes to tallies.");
 
   params.addRequiredCoupledVar("temperature", "The temperature of the medium.");
-  params.addRequiredParam<std::vector<unsigned int>>("blocks",
-                                                     "Blocks on which this kernel is defined.");
+  params.addRequiredParam<std::vector<SubdomainName>>("blocks",
+                                                      "Blocks on which this kernel is defined.");
   params.addRequiredParam<std::vector<unsigned int>>("materials",
                                                      "OpenMC material ids for each block.");
   params.addParam<Real>("z_coord", 0, "The axial coordinate for 2D calculations");
@@ -62,14 +62,22 @@ CollisionKernel::CollisionKernel(const InputParameters & params)
   // Check for 2D parameters
   if (_is_2D && !params.isParamSetByUser("z_coord"))
     mooseError("The z_coord parameter must be specified for 2D calculations");
+  if (!_is_2D && params.isParamSetByUser("z_coord"))
+    mooseError("The z_coord parameter must not be specified for 3D calculations");
 
   // Build map from subdomains to OpenMC materials
-  const auto blocks = getParam<std::vector<unsigned int>>("blocks");
+  const auto blocks = _mesh.getSubdomainIDs(getParam<std::vector<SubdomainName>>("blocks"));
   const auto materials = getParam<std::vector<unsigned int>>("materials");
   if (blocks.size() != materials.size())
     paramError("blocks", "The blocks parameter must be the same size as the materials parameter.");
+  // materials are indexed into openmc::model:::materials directly, not a map by their id
+  std::vector<unsigned int> mat_indexes(materials.size());
+  for (unsigned int i = 0; i < materials.size(); i++)
+    for (unsigned int j = 0; j < openmc::model::materials.size(); j++)
+      if (materials[i] == openmc::model::materials[j]->id_)
+        mat_indexes[i] = j;
   for (unsigned int i = 0; i < blocks.size(); i++)
-    _block_to_openmc_materials.insert(std::make_pair<int, int>(blocks[i], materials[i]));
+    _block_to_openmc_materials.insert(std::make_pair<int, int>(blocks[i], mat_indexes[i]));
 
   // Resize the neutrons objects used to call OpenMC routines and initialize the seeds
   // TODO optimization: create these neutrons in the study, re-use them everywhere
@@ -85,11 +93,11 @@ CollisionKernel::initialSetup()
     _console << "Kernel initial setup" << std::endl;
 
   // Check that all materials do exist in OpenMC, otherwise it will crash at XS calculation
-  for (auto & m : _block_to_openmc_materials)
+  for (auto & m : getParam<std::vector<unsigned int>>("materials"))
   {
-    auto search = openmc::model::material_map.find(m.second);
+    auto search = openmc::model::material_map.find(m);
     if (search == openmc::model::material_map.end())
-      mooseError("Could not find material ", m.second, " in OpenMC materials.");
+      mooseError("Could not find material ", m, " in OpenMC materials.");
   }
 
   // Check that all blocks exist, as a sanity check only
@@ -110,7 +118,10 @@ CollisionKernel::onSegment()
 
   // Set particle attributes
   p->sqrtkT() = std::sqrt(openmc::K_BOLTZMANN * _T[0]);
-  p->material() = _block_to_openmc_materials.at(_current_elem->subdomain_id()) - 1;
+  const auto mat = _block_to_openmc_materials.find(_current_elem->subdomain_id());
+  if (mat == _block_to_openmc_materials.end())
+    mooseError("Material not found in subdomain " + std::to_string(_current_elem->subdomain_id()));
+  p->material() = mat->second;
   p->coord(p->n_coord() - 1).universe = _current_subdomain_id;
   p->coord(p->n_coord() - 1).cell = _current_elem->id();
   p->u() = {
