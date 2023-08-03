@@ -2,52 +2,27 @@
 # GEOMETRY AND MESH
 # ==============================================================================
 
+# Full core has repeated 10010
+# Quarter core has 10008 10009 10010
+fuel_16 = 10010
+fuel_24 = 10010
+fuel_31 = 10010
+
 [Mesh]
   [core]
     type = FileMeshGenerator
-    file = 'quarter_core_2d.e'
-  []
-  [boundaries1]
-    type = SideSetsAroundSubdomainGenerator
-    input = 'core'
-    block = 10016
-    normal = ' 1  0  0'
-    new_boundary = 'right '
-  []
-  [boundaries2]
-    type = SideSetsAroundSubdomainGenerator
-    input = 'boundaries1'
-    block = 10016
-    normal = '-1  0  0'
-    new_boundary = 'left'
-  []
-  [boundaries3]
-    type = SideSetsAroundSubdomainGenerator
-    input = 'boundaries2'
-    block = 10016
-    normal = '0  1  0'
-    new_boundary = 'front'
-  []
-  [boundaries4]
-    type = SideSetsAroundSubdomainGenerator
-    input = 'boundaries3'
-    block = 10016
-    normal = '0 -1  0'
-    new_boundary = 'back'
-  []
-  [boundaries5]
-    type = SideSetsAroundSubdomainGenerator
-    input = 'boundaries4'
-    block = 10016
-    normal = '0  0  1'
-    new_boundary = 'top'
+    file = 'save_mesh/2d_full_core.e'
+    # file = 'quarter_core_2d.e'
   []
   [boundaries6]
-    type = SideSetsAroundSubdomainGenerator
-    input = 'boundaries5'
-    block = 10016
-    normal = '0  0  -1'
-    new_boundary = 'bottom'
+    type = SideSetsFromNormalsGenerator
+    input = core
+    normals = '-1 0 0
+                1 0 0
+                0 -1 0
+                0 1 0'
+    fixed_normal = true
+    new_boundary = 'left right bottom top'
   []
   [shift_z]
     type = TransformGenerator
@@ -56,17 +31,18 @@
     vector_value = '0 0 100'
   []
 
-  [Partitioner]
-    type = HierarchicalGridPartitioner
-    nx_nodes = 2
-    ny_nodes = 2
-    nz_nodes = 1
+  # [Partitioner]
+  #   type = HierarchicalGridPartitioner
+  #   nx_nodes = 2
+  #   ny_nodes = 5
+  #   nz_nodes = 1
 
-    # 48 processors per node on sawtooth
-    nx_procs = 2
-    ny_procs = 1
-    nz_procs = 1
-  []
+  #   # Does not work for 2D systems
+  #   # 48 processors per node on sawtooth
+  #   nx_procs = 1
+  #   ny_procs = 1
+  #   nz_procs = 1
+  # []
 
   # Shared memory run
   # [Partitioner]
@@ -85,6 +61,7 @@
   solve = false
   kernel_coverage_check = false
   skip_nl_system_check = true
+  verbose_multiapps = true
 []
 
 # Main things we care about for the coupling
@@ -97,6 +74,7 @@
   [power]
     order = CONSTANT
     family = MONOMIAL
+    block = '${fuel_16} ${fuel_24} ${fuel_31}'
   []
 []
 
@@ -104,23 +82,28 @@
   type = CollisionKernel
   temperature = temperature
   # mesh block ids
-  blocks = "10000 10001 10004 10006 10008 10009 10010 10013 10014"
+  # blocks = "10000 10001 10004 10006 10008 10009 10010 10013 10014 10016"  # 2D core
+  blocks = "10000 10001 2 3 ${fuel_16} ${fuel_24} ${fuel_31} 10013 4 10016 10004 10006 10014"  # 2D core - new mgs
   # blocks = "1 2 3 4 5 6 7 8 9"
   # openmc material id
-  materials = "1 2 5 7 9 10 11 14 15"
+  materials = "1      2 5 7 9      10     11    14  15   16     5     7  15"  # 2D core
   # materials = "14 17 1 7 9 10 11 16 15"
   # verbose = true
   z_coord = 100
 []
 
 [RayBCs]
-  [reflect]
-    type = ReflectRayBC
-    boundary = '3 4' #'back front top right left bottom'
-  []
+  # [reflect]
+  #   type = ReflectRayBC
+  #   boundary = '3 4' #'back front top right left bottom'
+  # []
+  # [vacuum]
+  #   type = KillRayBC
+  #   boundary = '1 2' #'bottom top right front'
+  # []
   [vacuum]
     type = KillRayBC
-    boundary = '1 2' #'bottom top right front'
+    boundary = 'bottom left right top'
   []
 []
 
@@ -159,37 +142,37 @@
 # ==============================================================================
 
 [UserObjects]
-  [tally]
-    type = OpenMCTally
-    id = 3
-    particle_type = 'neutron'
-    estimator = 'COLLISION'
-    scores = 'flux scatter (n,fission) 16'
-    filters = 'energy particle'
-    energy_bins = '1e-5 1e3 2e7'
-    filter_ids = 3
-    execute_on = 'initial'
-  []
+  # [tally]
+  #   type = OpenMCTally
+  #   id = 3
+  #   particle_type = 'neutron'
+  #   estimator = 'COLLISION'
+  #   scores = 'flux scatter (n,fission) 16'
+  #   filters = 'energy particle'
+  #   energy_bins = '1e-5 1e3 2e7'
+  #   # filter_ids = 3
+  #   execute_on = 'initial'
+  # []
 
-  [univtally]
-    type = OpenMCTally
-    id = 2
-    particle_type = 'neutron'
-    estimator = 'COLLISION'
-    scores = 'kappa-fission'
-    filters = 'universe'
-    filter_ids = 2
-    execute_on = 'initial'
-  []
+  # [univtally]
+  #   type = OpenMCTally
+  #   id = 2
+  #   particle_type = 'neutron'
+  #   estimator = 'COLLISION'
+  #   scores = 'kappa-fission'
+  #   filters = 'universe'
+  #   # filter_ids = 2
+  #   execute_on = 'initial'
+  # []
 
   [celltally]
     type = OpenMCTally
-    id = 1
+    id = 6
     particle_type = 'neutron'
     estimator = 'COLLISION'
     scores = 'kappa-fission'
     filters = 'cell'
-    filter_ids = 1
+    # filter_ids = 1
     execute_on = 'initial'
   []
 []
@@ -200,6 +183,8 @@
     tally_id = 6
     execute_on = TIMESTEP_END
     variable = power
+    granularity = 'cell'
+    score = 'kappa-fission'
   []
 []
 
@@ -208,15 +193,16 @@
   [pin_powers]
     type = NearestPointIntegralVariablePostprocessor
     variable = 'power'
-    block = '10008 10009 10010'
+    block = '${fuel_16} ${fuel_24} ${fuel_31}'
     points_file = pin_file
+    execute_on = 'TIMESTEP_END'
   []
 []
 
 [MultiApps]
   [pin_mesh]
     type = TransientMultiApp
-    # execute_on = TIMESTEP_END
+    execute_on = TIMESTEP_BEGIN
     input_files = 'output_pin.i'
   []
 []
@@ -224,8 +210,7 @@
 [Transfers]
   [power_uo]
     type = MultiAppUserObjectTransfer
-    multi_app = pin_mesh
-    direction = 'TO_MULTIAPP'
+    to_multi_app = pin_mesh
     user_object = pin_powers
     variable = pin_power
     execute_on = TIMESTEP_END
@@ -237,17 +222,17 @@
 # ==============================================================================
 
 # To look at domain decomposition
-[AuxVariables/domains]
-  order = CONSTANT
-  family = MONOMIAL
-[]
+# [AuxVariables/domains]
+#   order = CONSTANT
+#   family = MONOMIAL
+# []
 
-[AuxKernels]
-  [domains]
-    type = ProcessorIDAux
-    variable = domains
-  []
-[]
+# [AuxKernels]
+#   [domains]
+#     type = ProcessorIDAux
+#     variable = domains
+#   []
+# []
 
 [VectorPostprocessors]
   [mem]

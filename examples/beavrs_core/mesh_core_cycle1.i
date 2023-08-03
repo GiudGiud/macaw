@@ -1,12 +1,22 @@
-folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
+folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
+
+[Outputs]
+  exodus = true
+  file_base = 'quarter_core_2d'
+  # file_base = 'full_core_2d'
+  # file_base = 'quarter_core_3d'
+  # file_base = 'full_core_3d'
+[]
 
 [Mesh]
   # Keep it quarter core and 2D
   # inactive = 'core extrude'
+  # 2D quarter core
+  inactive = 'core center delete_left delete_top extrude'
   # 2D full core
   # inactive = 'quarter_core center delete_left delete_top extrude'
   # 3D quarter core
-  inactive = 'core'
+  # inactive = 'core'
   # 3D full core
   # inactive = 'quarter_core center delete_left delete_top'
 
@@ -20,22 +30,64 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
     top_sideset = '9'
   []
 
+  # [fuel_31]
+  #   type = FileMeshGenerator
+  #   file = '${folder}/pin_cells/new_fuel_31enr_8.e'
+  # []
+  [base_fuel_31]
+    type = ConcentricCircleMeshGenerator
+    num_sectors = 4
+    radii = '0.39218 0.40005 0.4572'
+    rings = '1 1 1 1'
+    has_outer_square = on
+    pitch = ${fparse 0.62992 * 2}
+    preserve_volumes = true
+    output = true
+    save_with_name = 'b_fuel_31'
+  []
+  [fuel_31_2]
+    type = RenameBlockGenerator
+    input = 'base_fuel_31'
+    old_block = '1 2 3 4'
+    new_block = 'fuel gap clad water'
+  []
   [fuel_31]
-    type = FileMeshGenerator
-    file = '${folder}/pin_cells/new_fuel_31enr_8.e'
+    type = RenameBlockGenerator
+    input = 'fuel_31_2'
+    old_block = '1'
+    new_block_id = '10010'
+    output = true
+    save_with_name = 'fuel_31'
+  []
+  [fuel_24_1]
+    type = RenameBlockGenerator
+    input = fuel_31
+    old_block = 'fuel'
+    new_block = 'fuel_24'
+    output = true
+    save_with_name = 'fuel_24'
   []
   [fuel_24]
     type = RenameBlockGenerator
+    input = fuel_24_1
+    old_block = '10010'
+    new_block = '10009'
+  []
+  [fuel_16_1]
+    type = RenameBlockGenerator
     input = fuel_31
-    old_block_id = '10010'
-    new_block_id = '10009'
+    old_block = 'fuel'
+    new_block = 'fuel_16'
+    output = true
+    save_with_name = 'fuel_16'
   []
   [fuel_16]
     type = RenameBlockGenerator
-    input = fuel_31
-    old_block_id = '10010'
-    new_block_id = '10008'
+    input = fuel_16_1
+    old_block = '10010'
+    new_block = '10008'
   []
+
   [bp]
     type = FileMeshGenerator
     file = '${folder}/pin_cells/new_bp_8.e'
@@ -76,10 +128,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [16enr_no_instr_rb]
     type = RenameBoundaryGenerator
@@ -91,7 +143,15 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
     type = StitchedMeshGenerator
     inputs = '16enr_no_instr_rb sleeve'
     stitch_boundaries_pairs = '50 51'
+    output = true
+    save_with_name = '16enr_assem'
   []
+  # [16enr_no_instr]
+  #   type = RenameBoundaryGenerator
+  #   input = 16enr_no_instr_0
+  #   old_boundary_id = '1  2  3  4'
+  #   new_boundary_id = ''
+  # []
 
   [31enr_no_instr_pins]
     type = PatternedMeshGenerator
@@ -115,10 +175,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [31enr_no_instr_rb]
     type = RenameBoundaryGenerator
@@ -154,10 +214,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [31enr_6n_rb]
     type = RenameBoundaryGenerator
@@ -213,10 +273,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [31enr_6w_rb]
     type = RenameBoundaryGenerator
@@ -290,10 +350,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [31enr_20_rb]
     type = RenameBoundaryGenerator
@@ -329,10 +389,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [31enr_16_rb]
     type = RenameBoundaryGenerator
@@ -368,10 +428,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [31enr_15nw_rb]
     type = RenameBoundaryGenerator
@@ -463,10 +523,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [24enr_no_instr_rb]
     type = RenameBoundaryGenerator
@@ -503,10 +563,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [24enr_12_rb]
     type = RenameBoundaryGenerator
@@ -543,10 +603,10 @@ folder = '/home/guillaume/projects/mockingbird/problems/beavrs/generator_geom'
                0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'
     y_width = 1.25984
     x_width = 1.25984
-    bottom_boundary = 1
-    right_boundary = 2
-    top_boundary = 3
-    left_boundary = 4
+    bottom_boundary = bottom
+    right_boundary = right
+    top_boundary = top
+    left_boundary = left
   []
   [24enr_16_rb]
     type = RenameBoundaryGenerator
@@ -928,6 +988,3 @@ water_baffle_corner_se water_baffle_corner_ne'
   nl_max_its = 0
 []
 
-[Outputs]
-  exodus = true
-[]

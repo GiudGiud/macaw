@@ -7,18 +7,18 @@
     nz = 10
     xmin = -5
     ymin = -5
-    zmin = -5
+    zmin = -2.5
     xmax = 5
     ymax = 5
-    zmax = 5
+    zmax = 2.5
   []
-  [add_subdomain]
+  [add_infinite_z_pin]
     input = gmg
     type = SubdomainBoundingBoxGenerator
-    top_right = '1 1 1'
-    bottom_left = '-1 -1 -1'
+    top_right = '1 1 100'
+    bottom_left = '-1 -1 -100'
     block_id = 1
-    block_name = 'center'
+    block_name = 'pin'
   []
 []
 
@@ -40,8 +40,8 @@
 [RayKernels/collision]
   type = CollisionKernel
   temperature = temperature
-  blocks = "0 1 2"
-  materials = "1 1 1" # openmc material id
+  blocks = "0 1"
+  materials = "26 25" # openmc material id
   # verbose = true
 []
 
@@ -64,6 +64,8 @@
   # Needed to cache Ray data for RayTracingMeshOutput
   data_on_cache_traces = false
   aux_data_on_cache_traces = false
+
+  tolerate_failure = true
 []
 
 [Executioner]
@@ -71,7 +73,7 @@
 []
 
 [Outputs]
-  exodus = false
+  exodus = true
   csv = true
   [console]
     type = Console
@@ -141,4 +143,38 @@
   type = PerProcessorRayTracingResultsVectorPostprocessor
   execute_on = TIMESTEP_END
   study = study
+  outputs = none
+[]
+
+##############################################################################
+# Tallies
+
+[UserObjects]
+  [tally]
+    type = OpenMCTally
+    particle_type = 'neutron'
+    estimator = 'COLLISION'
+    scores = 'kappa-fission'
+    filters = 'cell'
+    execute_on = 'initial'
+    id = 1
+  []
+[]
+
+[AuxKernels]
+  [cell_val]
+    type = OpenMCTallyAux
+    granularity = 'cell'
+    score = 'kappa-fission'
+    tally_id = 1
+    execute_on = TIMESTEP_END
+    variable = power
+  []
+[]
+
+[AuxVariables]
+  [power]
+    order = CONSTANT
+    family = MONOMIAL
+  []
 []

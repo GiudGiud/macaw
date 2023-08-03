@@ -1,4 +1,5 @@
 [Mesh]
+  # Quarter core
   [gfm]
     type = GeneratedMeshGenerator
     dim = 2
@@ -15,6 +16,13 @@
   [pin_power]
     family = MONOMIAL
     order = CONSTANT
+  []
+[]
+
+[Postprocessors]
+  [power]
+    type = ElementIntegralVariablePostprocessor
+    variable = pin_power
   []
 []
 
