@@ -73,7 +73,7 @@ OpenMCStudy::validParams()
   params.addPrivateParam<bool>("_ray_dependent_subdomain_setup", false);
 
   // no need to kill the simulation on ray tracing failures
-  params.addParam<bool>("tolerate_failure", false, "Whether to stop on ray tracing failures");
+  params.addParam<bool>("tolerate_failure", true, "Whether to stop on ray tracing failures");
 
   return params;
 }
@@ -404,8 +404,6 @@ OpenMCStudy::defineRays()
 
     _rays.emplace_back(std::move(ray));
   }
-  if (_verbose)
-    _console << "Rays prepared " << _rays.size() << std::endl;
 }
 
 void
@@ -441,14 +439,11 @@ OpenMCStudy::postExecuteStudy()
   // Reduce all tallies, write state/source_point, run CMFD
   openmc::finalize_batch();
   openmc::mpi::n_procs = comm().size();
-  openmc::mpi::master = processor_id() == 0;
-
-  // TODO
-  // Check that keff is reduced across all ranks properly
+  openmc::mpi::master = (processor_id() == 0);
 
   // Output k-effective since OpenMC output is silenced
   _console << "Keff " << openmc::simulation::keff << " (" << openmc::simulation::keff_std
-           << ") Generation: "
+           << ") Local generation: "
            << openmc::simulation::keff_generation / openmc::settings::n_particles *
                   openmc::mpi::n_procs
            << std::endl;
@@ -521,7 +516,6 @@ OpenMCStudy::synchronizeBanks()
   // Compute total number of fission sites sampled
   int64_t start = 0;
   int64_t n_bank = openmc::simulation::fission_bank.size();
-  _console << "size of local fission bank " << n_bank << std::endl;
   MPI_Exscan(&n_bank, &start, 1, MPI_INT64_T, MPI_SUM, comm().get());
 
   // While we would expect the value of start on rank 0 to be 0, the MPI
@@ -601,7 +595,8 @@ OpenMCStudy::synchronizeBanks()
   start = 0;
   MPI_Exscan(&index_temp, &start, 1, MPI_INT64_T, MPI_SUM, comm().get());
   finish = start + index_temp;
-  _console << "    New finish rank " << comm().rank() << " : " << finish << std::endl;
+  if (_verbose)
+    _console << "    New finish rank " << comm().rank() << " : " << finish << std::endl;
 
   // ==========================================================================
   // Now that the sampling is complete, we need to ensure that we have exactly
@@ -641,8 +636,9 @@ OpenMCStudy::synchronizeBanks()
       }
     }
   }
-  _console << "Size of temporary bank on rank " << comm().rank() << " : " << index_temp
-           << std::endl;
+  if (_verbose)
+    _console << "Size of temporary bank on rank " << comm().rank() << " : " << index_temp
+             << std::endl;
 
   // Check size of bank before moving sites
   if (openmc::simulation::source_bank.size() < (unsigned)index_temp)
