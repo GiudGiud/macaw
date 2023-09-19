@@ -92,7 +92,7 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
     _verbose(getParam<bool>("verbose"))
 {
   /*
-  This class doesnt really need to get anything that can be in OpenMC input files:
+  This class doesn't really need to get anything that can be in OpenMC input files:
   - materials
   - settings (number of particles, batches, etc)
   - even tallies (for now, we'll just replicated)!
@@ -225,7 +225,6 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
     mooseWarning("Unable to set the number of batches for a non Transient Executioner");
 }
 
-
 OpenMCStudy::~OpenMCStudy()
 {
   // Finalize and free up memory
@@ -266,14 +265,14 @@ OpenMCStudy::generateRays()
             openmc::simulation::progeny_per_particle.end(),
             0);
 
-  //TODO Reinit the elements for the physics
+  // TODO Reinit the elements for the physics
 
   // Move the rays to the work buffers
   for (auto & ray : _local_rays)
   {
-    //TODO All the resetting because generateRays is called everytime
-    // ray->resetCounters();
-    // ray->clearStartingInfo();
+    // TODO All the resetting because generateRays is called everytime
+    //  ray->resetCounters();
+    //  ray->clearStartingInfo();
 
     moveRayToBuffer(ray);
   }
@@ -341,7 +340,7 @@ OpenMCStudy::defineRays()
   openmc::initialize_generation();
 
   // Set the batch and generation number
-  //TODO separate batches and generations
+  // TODO separate batches and generations
   openmc::simulation::current_batch = _t_step;
   openmc::simulation::current_gen = 1;
   openmc::Particle p;
@@ -349,7 +348,7 @@ OpenMCStudy::defineRays()
   // Loop over particles. create the rays
   // This needs to be done over all processes, since we do not know where the particle will
   // be created.
-  //TODO OpenMP parallelism
+  // TODO OpenMP parallelism
   for (int64_t i = 0; i < _source_bank_size; ++i)
   {
     // Get a ray from the study
@@ -668,11 +667,17 @@ void
 OpenMCStudy::checkOpenMCVersion()
 {
   if (openmc::VERSION_MAJOR < 0 || openmc::VERSION_MINOR < 13)
-    mooseWarning("OpenMC version detected ", openmc::VERSION_MAJOR, ":", openmc::VERSION_MINOR,
-        "is anterior to the supported version (0.13).");
+    mooseWarning("OpenMC version detected ",
+                 openmc::VERSION_MAJOR,
+                 ":",
+                 openmc::VERSION_MINOR,
+                 "is anterior to the supported version (0.13).");
   if (openmc::VERSION_MAJOR > 0 || openmc::VERSION_MINOR > 13)
-    mooseWarning("OpenMC version detected ", openmc::VERSION_MAJOR, ":", openmc::VERSION_MINOR,
-        "is posterior to the supported version (0.13).");
+    mooseWarning("OpenMC version detected ",
+                 openmc::VERSION_MAJOR,
+                 ":",
+                 openmc::VERSION_MINOR,
+                 "is posterior to the supported version (0.13).");
 
-  //TODO Check for specifically unsupported versions
+  // TODO Check for specifically unsupported versions
 }

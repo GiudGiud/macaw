@@ -161,14 +161,14 @@ CollisionKernel::onSegment()
 
   // Compute distance to next collision
   // p.event_advance();
-  // TODO scores tracklength tallies as well
+  // TODO scores track-length tallies as well
   // TODO Can we use this??
 
   const Real collision_distance = -std::log(openmc::prn(p->current_seed())) / p->macro_xs().total;
 
-  // Contribute to the tracklength keff estimator
-  p->keff_tally_tracklength() += p->wgt() *
-      std::min(collision_distance, _current_segment_length) * p->macro_xs().nu_fission;
+  // Contribute to the track-length k-eff estimator
+  p->keff_tally_tracklength() +=
+      p->wgt() * std::min(collision_distance, _current_segment_length) * p->macro_xs().nu_fission;
 
   // Keep track of the particle seed for consistent random number generation
   currentRay()->auxData(4) = p->seeds(0);

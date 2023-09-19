@@ -34,8 +34,6 @@ public:
   void finalize(){};
 
 protected:
-  // TODO Add docstrings
-
   // Id to reference in TallyAux
   int _id;
 
@@ -65,8 +63,8 @@ protected:
 };
 
 /**
- * Comparison funtion for a custom sort of the specified Filters
- *so that tally values can be systmatically retieved easily in OpenMCTallyAux
+ * Comparison function for a custom sort of the specified Filters
+ *so that tally values can be systematically retrieved easily in OpenMCTallyAux
  */
 bool
 cmp(std::string x, std::string y)

@@ -112,7 +112,7 @@ OpenMCTally::initialize()
   // TODO: check for a mesh parameter and add mesh if exists
 
   // Create vector of tally and add each one from the _filters parameters
-  vector<Filter*> filters;
+  vector<Filter *> filters;
   // Sort the filters into a specific order
   std::sort(_filters.begin(), _filters.end(), cmp);
 
@@ -125,14 +125,14 @@ OpenMCTally::initialize()
     {
       _console << " Adding energy filter" << std::endl;
 
-      EnergyFilter* energy_filter = dynamic_cast<EnergyFilter*>(filter_ptr);
+      EnergyFilter * energy_filter = dynamic_cast<EnergyFilter *>(filter_ptr);
       energy_filter->set_bins(_energy_bins);
     }
     else if (filter_ptr->type() == "particle")
     {
       _console << " Adding particle filter" << std::endl;
 
-      ParticleFilter* particle_filter = dynamic_cast<ParticleFilter*>(filter_ptr);
+      ParticleFilter * particle_filter = dynamic_cast<ParticleFilter *>(filter_ptr);
 
       vector<ParticleType> types(_particle);
       particle_filter->set_particles(types);

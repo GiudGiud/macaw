@@ -12,7 +12,7 @@
 #include "AuxKernel.h"
 
 /**
- * Retrieves tally values from OpenMC tallies and tranfers the values
+ * Retrieves tally values from OpenMC tallies and transfers the values
  * to a MOOSE auxiliary variable
  */
 class OpenMCTallyAux : public AuxKernel
