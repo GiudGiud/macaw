@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <settings>
   <run_mode>eigenvalue</run_mode>
-  <particles>200000</particles>
+  <particles>20000</particles>
   <batches>5</batches>
   <inactive>0</inactive>
   <state_point>

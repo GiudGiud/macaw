@@ -81,56 +81,58 @@
 # TALLIES
 # ==============================================================================
 
-# [UserObjects]
-#   inactive = 'tally univtally'
+[UserObjects]
+  # inactive = 'tally univtally'
+
+  #   [tally]
+  #     type = OpenMCTally
+  #     particle_type = 'neutron'
+  #     estimator = 'COLLISION'
+  #     scores = 'flux scatter (n,fission) 16'
+  #     filters = 'energy particle'
+  #     energy_bins = '1e-5 1e3 2e7'
+  #     execute_on = 'initial'
+  #     id = 1
+  #   []
+  # []
+  #
+  #   [univtally]
+  #     type = OpenMCTally
+  #     particle_type = 'neutron'
+  #     estimator = 'COLLISION'
+  #     scores = 'kappa-fission'
+  #     filters = 'universe'
+  #     execute_on = 'initial'
+  #   []
+  #
+  [celltally]
+    type = OpenMCTally
+    id = 1
+    particle_type = 'neutron'
+    estimator = 'COLLISION'
+    scores = 'kappa-fission'
+    filters = 'cell'
+    execute_on = 'initial'
+  []
+[]
 #
-#   [tally]
-#     type = OpenMCTally
-#     particle_type = 'neutron'
-#     estimator = 'COLLISION'
-#     scores = 'flux scatter (n,fission) 16'
-#     filters = 'energy particle'
-#     energy_bins = '1e-5 1e3 2e7'
-#     execute_on = 'initial'
-#   []
-#
-#   [univtally]
-#     type = OpenMCTally
-#     particle_type = 'neutron'
-#     estimator = 'COLLISION'
-#     scores = 'kappa-fission'
-#     filters = 'universe'
-#     execute_on = 'initial'
-#   []
-#
-#   [celltally]
-#     type = OpenMCTally
-#     id = 1
-#     particle_type = 'neutron'
-#     estimator = 'COLLISION'
-#     scores = 'kappa-fission'
-#     filters = 'cell'
-#     execute_on = 'initial'
-#   []
-# []
-#
-# [AuxKernels]
-#   [cell_val]
-#     type = OpenMCTallyAux
-#     granularity = 'cell'
-#     score = 'kappa-fission'
-#     tally_id = 1
-#     execute_on = TIMESTEP_END
-#     variable = power
-#   []
-# []
-#
-# [AuxVariables]
-#   [power]
-#     order = CONSTANT
-#     family = MONOMIAL
-#   []
-# []
+[AuxKernels]
+  [cell_val]
+    type = OpenMCTallyAux
+    granularity = 'cell'
+    score = 'kappa-fission'
+    tally_id = 1
+    execute_on = TIMESTEP_END
+    variable = power
+  []
+[]
+
+[AuxVariables]
+  [power]
+    order = CONSTANT
+    family = MONOMIAL
+  []
+[]
 #
 # Plot fission rates on a coarse pin-cell mesh
 # [VectorPostprocessors]

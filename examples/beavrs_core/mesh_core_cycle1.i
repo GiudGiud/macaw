@@ -21,10 +21,10 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
   # inactive = 'quarter_core center delete_left delete_top'
 
   [extrude]
-    type = FancyExtruderGenerator
+    type = AdvancedExtruderGenerator
     input = delete_top
     heights = '20 15 1.748 0.4141 3.3579 57.505 5.715 46.482 5.715 46.482 5.715 46.482 5.715 46.482 5.715 46.482 5.715 37.783 9.298 3.358 2 2.54 3.345 8.827 28.124'
-    num_layers = '1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'  # 25 zones
+    num_layers = '1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1' # 25 zones
     direction = '0 0 1'
     bottom_sideset = '8'
     top_sideset = '9'
@@ -40,7 +40,7 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
     radii = '0.39218 0.40005 0.4572'
     rings = '1 1 1 1'
     has_outer_square = on
-    pitch = ${fparse 0.62992 * 2}
+    pitch = '${fparse 0.62992 * 2}'
     preserve_volumes = true
     output = true
     save_with_name = 'b_fuel_31'
@@ -105,7 +105,7 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
     file = '${folder}/assemblies/sleeve_gap_8.e'
   []
 
-#---------------------assemblies-----------------------------
+  #---------------------assemblies-----------------------------
   [16enr_no_instr_pins]
     type = PatternedMeshGenerator
     inputs = 'fuel_16 bp gt it'
@@ -540,7 +540,6 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
     stitch_boundaries_pairs = '50 51'
   []
 
-
   [24enr_12_pins]
     type = PatternedMeshGenerator
     inputs = 'fuel_24 bp gt it'
@@ -579,7 +578,6 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
     inputs = '24enr_12_rb sleeve'
     stitch_boundaries_pairs = '50 51'
   []
-
 
   [24enr_16_pins]
     type = PatternedMeshGenerator
@@ -711,7 +709,6 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
     new_boundary_id = '4 3 2 1'
   []
 
-
   [water_baffle_w_not_moved]
     type = FileMeshGenerator
     file = '${folder}/assemblies/water_baffle_1side_8.e'
@@ -781,7 +778,6 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
     new_boundary_id = '4 3 2 1'
   []
 
-
   [water_baffle_corner_nw_not_moved]
     type = FileMeshGenerator
     file = '${folder}/assemblies/water_baffle_corner_8.e'
@@ -849,7 +845,7 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
     old_boundary_id = '1 4 3 2'
     new_boundary_id = '4 3 2 1'
   []
-#--------------------------------------------------------
+  #--------------------------------------------------------
   [core]
     type = PatternedMeshGenerator
     #               0           1        2         3        4          5           6
@@ -862,7 +858,7 @@ folder = '/Users/giudgl/projects/mockingbird/problems/beavrs/generator_geom'
 water_baffle_s water_baffle_e water_baffle_n water_baffle_corner_nw water_baffle_corner_sw
 
 water_baffle_corner_se water_baffle_corner_ne'
-#           26                  27
+    #           26                  27
     pattern = '10 10 10 10 26 21 21 21 21 21 21 21 25 10 10 10 10;
                10 10 26 21 18  5 12  5 12  5 12  5 17 21 25 10 10;
                10 26 18  5  5  6  0  4  0  4  0  6  5  5 17 25 10;
@@ -898,7 +894,7 @@ water_baffle_corner_se water_baffle_corner_ne'
 water_baffle_s water_baffle_e water_baffle_n water_baffle_corner_nw water_baffle_corner_sw
 
 water_baffle_corner_se water_baffle_corner_ne'
-#           26                  27
+    #           26                  27
     pattern = ' 0  2  0  2  0  2  0  1  0  3;
                 2  0  1  0  2  0  2  0  4  5;
                 0  1  0  1  0  2  0  1  0  3;
@@ -920,7 +916,6 @@ water_baffle_corner_se water_baffle_corner_ne'
     top_boundary = 3
     left_boundary = 4
   []
-
 
   [center]
     # Center the mesh around 0,0
