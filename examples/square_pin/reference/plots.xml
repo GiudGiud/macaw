@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plots>
+  <plot basis="xy" color_by="cell" id="19" type="slice">
+    <origin>0 0 0</origin>
+    <width>5 5</width>
+    <pixels>400 400</pixels>
+  </plot>
+  <plot basis="xz" color_by="cell" id="20" type="slice">
+    <origin>0 0 0</origin>
+    <width>5 5</width>
+    <pixels>400 400</pixels>
+  </plot>
+</plots>

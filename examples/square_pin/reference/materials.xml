@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<materials>
+  <material depletable="true" id="19" name="fuel">
+    <density units="g/cc" value="10.0" />
+    <nuclide ao="0.0004523305496680539" name="U234" />
+    <nuclide ao="0.05060678290832386" name="U235" />
+    <nuclide ao="0.948709083169038" name="U238" />
+    <nuclide ao="0.00023180337297007338" name="U236" />
+    <nuclide ao="1.999242" name="O16" />
+    <nuclide ao="0.000758" name="O17" />
+  </material>
+  <material id="20" name="moderator">
+    <density units="g/cc" value="0.74" />
+    <nuclide ao="0.04999221300000001" name="H1" />
+    <nuclide ao="7.787e-06" name="H2" />
+    <nuclide ao="0.023990904" name="O16" />
+    <nuclide ao="9.096e-06" name="O17" />
+  </material>
+</materials>
