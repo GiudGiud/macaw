@@ -7,7 +7,9 @@
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
+// local includes
 #include "CollisionKernel.h"
+#include "MaCawUtils.h"
 
 // openmc includes
 #include "openmc/capi.h"
@@ -74,16 +76,17 @@ CollisionKernel::CollisionKernel(const InputParameters & params)
   std::vector<unsigned int> mat_indexes(materials.size());
   for (unsigned int i = 0; i < materials.size(); i++)
     for (unsigned int j = 0; j < openmc::model::materials.size(); j++)
-      if (materials[i] == openmc::model::materials[j]->id_)
+      if ((int)materials[i] == openmc::model::materials[j]->id_)
         mat_indexes[i] = j;
   for (unsigned int i = 0; i < blocks.size(); i++)
     _block_to_openmc_materials.insert(std::make_pair<int, int>(blocks[i], mat_indexes[i]));
 
   // Resize the neutrons objects used to call OpenMC routines and initialize the seeds
   // TODO optimization: create these neutrons in the study, re-use them everywhere
-  _particles.resize(libMesh::n_threads());
-  for (unsigned int i = 0; i < _particles.size(); i++)
-    openmc::initialize_history(_particles[i], i + 1);
+  _particles.resize(1); // libMesh::n_threads());
+  // WE CANNOT DO THIS because the global simulation weight is modified
+  // for (unsigned int i = 0; i < _particles.size(); i++)
+  //   openmc::initialize_history(_particles[i], i + 1);
 }
 
 void
@@ -110,22 +113,43 @@ void
 CollisionKernel::onSegment()
 {
   // Use a fake neutron to compute the cross sections
-  auto p = &_particles[_tid];
+  auto p = &_particles[0]; //_tid]; (kernel already threaded)
+
+  if (_verbose)
+    std::cout << "In kernel onSegment" << std::endl;
+
+  // Reset the particle since we are reusing them
+  // Do not clear the particle, we rely on it for keeping last_sqrtkbT and last_mat
+  // p->clear();
 
   // Resize to account for filters specified in moose (only needed once)
   // TODO Move to inital setup once can show that all tallies have already been added
+  // THIS CANNOT BE DONE CURRENTLY.
+  // Note that the ray tracing cost is way higher anyway
   p->filter_matches().resize(openmc::model::tally_filters.size());
 
   // Set particle attributes
-  p->sqrtkT() = std::sqrt(openmc::K_BOLTZMANN * _T[0]);
-  const auto mat = _block_to_openmc_materials.find(_current_elem->subdomain_id());
+  p->sqrtkT() = std::sqrt(openmc::K_BOLTZMANN * 293.6); // _T[0]);   ////////////////
+  const auto mat = _block_to_openmc_materials.find(_current_subdomain_id);
   if (mat == _block_to_openmc_materials.end())
-    mooseError("Material not found in subdomain " + std::to_string(_current_elem->subdomain_id()));
+    mooseError("Material not found in subdomain " + std::to_string(_current_subdomain_id));
   p->material() = mat->second;
   p->coord(p->n_coord() - 1).universe = _current_subdomain_id;
   p->coord(p->n_coord() - 1).cell = _current_elem->id();
-  p->u() = {
-      currentRay()->direction()(0), currentRay()->direction()(1), currentRay()->direction()(2)};
+  if (_is_2D)
+  {
+    const Real factor = sqrt(currentRay()->direction().norm_sq() /
+                             (1 - currentRay()->auxData(9) * currentRay()->auxData(9)));
+    p->u() = {currentRay()->direction()(0) / factor,
+              currentRay()->direction()(1) / factor,
+              currentRay()->auxData(9)};
+    mooseAssert(MooseUtils::absoluteFuzzyEqual(p->u().norm(), 1),
+                "Should be unit direction " +
+                    Moose::stringify(Point(p->u()[0], p->u()[1], p->u()[2])));
+  }
+  else
+    p->u() = {
+        currentRay()->direction()(0), currentRay()->direction()(1), currentRay()->direction()(2)};
   p->E() = currentRay()->auxData(0);
   p->wgt() = currentRay()->auxData(1);
   p->n_progeny() = currentRay()->auxData(2);
@@ -136,19 +160,41 @@ CollisionKernel::onSegment()
   // To avoid an overflow in the n_progeny array for neutrons which would have
   // changed domain, we adjust the value, however this prevents us from using the
   // openmc sorting algorithm when using domain decomposition
-  if (p->id() - 1 - openmc::simulation::work_index[comm().rank()] >=
-      openmc::simulation::work_per_rank)
-    p->id() = 1 + openmc::simulation::work_index[comm().rank()];
-  else if (p->id() - 1 - openmc::simulation::work_index[comm().rank()] < 0)
-    p->id() = 1 + openmc::simulation::work_index[comm().rank()];
+  if (comm().size() > 1)
+  {
+    if (p->id() - 1 - openmc::simulation::work_index[comm().rank()] >=
+        openmc::simulation::work_per_rank)
+      p->id() = 1 + openmc::simulation::work_index[comm().rank()];
+    else if (p->id() - 1 - openmc::simulation::work_index[comm().rank()] < 0)
+      p->id() = 1 + openmc::simulation::work_index[comm().rank()];
+  }
+
+  // Previous tracking information
+  // p->sqrtkT_last() = currentRay()->auxData(13);
+  // p->material_last() = currentRay()->auxData(14);
 
   // Set the particle seed for consistent random number generation
-  p->seeds(0) = currentRay()->auxData(4);
-  p->seeds(1) = currentRay()->auxData(5);
-  p->seeds(2) = currentRay()->auxData(6);
+  p->seeds(0) =
+      (unsigned long long)(currentRay()->auxData(4)) + (long long)currentRay()->auxData(10);
+  p->seeds(1) =
+      (unsigned long long)(currentRay()->auxData(5)) + (long long)currentRay()->auxData(11);
+  p->seeds(2) =
+      (unsigned long long)(currentRay()->auxData(6)) + (long long)currentRay()->auxData(12);
+
+  if (_verbose)
+  {
+    std::cout << "seeds " << p->seeds()[0] << " " << p->seeds()[1] << " " << p->seeds()[2] << " "
+              << *p->current_seed() << std::endl;
+    std::cout << "Skipping evaluation ?" << p->sqrtkT() << " " << p->sqrtkT_last() << " "
+              << p->material() << " " << p->material_last() << std::endl;
+  }
 
   // Set particle type
   p->type() = openmc::ParticleType(currentRay()->auxData(7));
+
+  if (p->type() == openmc::ParticleType::electron || p->type() == openmc::ParticleType::positron ||
+      p->type() == openmc::ParticleType::photon)
+    mooseError("Unsupported particle");
 
   // Reset the OpenMC particle status
   p->alive() = true;
@@ -164,21 +210,40 @@ CollisionKernel::onSegment()
   // TODO scores track-length tallies as well
   // TODO Can we use this??
 
-  const Real collision_distance = -std::log(openmc::prn(p->current_seed())) / p->macro_xs().total;
+  // Adjust for 2D
+  const Real effective_segment_length =
+      _is_2D ? _current_segment_length / cos(p->u()[2]) : _current_segment_length;
+
+  const auto rand = openmc::prn(p->current_seed());
+  const Real collision_distance = -std::log(rand) / p->macro_xs().total;
+  const Real distance = std::min(collision_distance, effective_segment_length);
 
   // Contribute to the track-length k-eff estimator
-  p->keff_tally_tracklength() +=
-      p->wgt() * std::min(collision_distance, _current_segment_length) * p->macro_xs().nu_fission;
+  if (openmc::settings::run_mode == openmc::RunMode::EIGENVALUE &&
+      p->type() == openmc::ParticleType::neutron)
+    p->keff_tally_tracklength() += p->wgt() * distance * p->macro_xs().nu_fission;
 
   // Keep track of the particle seed for consistent random number generation
-  currentRay()->auxData(4) = p->seeds(0);
-  currentRay()->auxData(5) = p->seeds(1);
-  currentRay()->auxData(6) = p->seeds(2);
+  Real round, diff;
+  MaCaw::convertInt64(p->seeds(0), round, diff);
+  currentRay()->auxData(4) = round;
+  currentRay()->auxData(10) = diff;
+  MaCaw::convertInt64(p->seeds(1), round, diff);
+  currentRay()->auxData(5) = round;
+  currentRay()->auxData(11) = diff;
+  MaCaw::convertInt64(p->seeds(2), round, diff);
+  currentRay()->auxData(6) = round;
+  currentRay()->auxData(12) = diff;
 
-  // Shorter than next intersection, ray tracing will take care of moving the
-  // particle
-  if (collision_distance > _current_segment_length)
+  // Longer travel than the distance to the next intersection, ray tracing will take care of moving
+  // the particle
+  if (collision_distance > effective_segment_length)
   {
+    // Previous tracking information
+    // this was previously done in openmc::geometry::find_cell_inner
+    // currentRay()->auxData(13) = p->sqrtkT();
+    // currentRay()->auxData(14) = p->material();
+
     // p.event_cross_surface();
     // TODO Score track length tallies
     // TODO Score surface tallies
@@ -187,9 +252,13 @@ CollisionKernel::onSegment()
   else
   {
     // Advance ray (really, move backwards)
-    Point current_position =
-        currentRay()->currentPoint() -
-        (_current_segment_length - collision_distance) * currentRay()->direction();
+    // if (_verbose)
+    //   std::cout << currentRay()->currentPoint() << effective_segment_length << " "
+    //             << collision_distance << " " << Point(p->u()[0], p->u()[1], p->u()[2]) <<
+    //             std::endl;
+    Point current_position = currentRay()->currentPoint() -
+                             _current_segment_length * currentRay()->direction() +
+                             collision_distance * Point(p->u()[0], p->u()[1], p->u()[2]);
 
     // Adapt for two dimensions
     if (_is_2D)
@@ -216,7 +285,10 @@ CollisionKernel::onSegment()
 
     // Adapt for two dimensions
     if (_is_2D)
+    {
+      currentRay()->auxData(9) = new_direction(2);
       new_direction(2) = 0;
+    }
 
     if (p->event() == openmc::TallyEvent::SCATTER)
       changeRayStartDirection(current_position, new_direction);
@@ -230,13 +302,20 @@ CollisionKernel::onSegment()
     // Keep track of particle number of progeny
     currentRay()->auxData(2) = p->n_progeny();
 
+    // Keep track of the particle seed for consistent random number generation
+    Real round, diff;
+    MaCaw::convertInt64(p->seeds(0), round, diff);
+    currentRay()->auxData(4) = round;
+    currentRay()->auxData(10) = diff;
+    MaCaw::convertInt64(p->seeds(1), round, diff);
+    currentRay()->auxData(5) = round;
+    currentRay()->auxData(11) = diff;
+    MaCaw::convertInt64(p->seeds(2), round, diff);
+    currentRay()->auxData(6) = round;
+    currentRay()->auxData(12) = diff;
+
     // Keep track of particle number of events
     currentRay()->auxData(8) = p->n_event();
-
-    // Keep track of the particle seed for consistent random number generation
-    currentRay()->auxData(4) = p->seeds(0);
-    currentRay()->auxData(5) = p->seeds(1);
-    currentRay()->auxData(6) = p->seeds(2);
 
     // Mark the ray as 'should not continue' if absorption was sampled
     // TODO Handle secondary particles
@@ -250,13 +329,29 @@ CollisionKernel::onSegment()
       p->event_death();
 
       // Particles are sharing ids, can't overwrite the progeny number
-      openmc::simulation::progeny_per_particle[p->id() - 1] += current_progeny;
+      // FIXME: This isnt quite right, it's assigning more progeny to some banked fission sites
+      if (comm().size() > 1)
+        openmc::simulation::progeny_per_particle[p->id() - 1] += current_progeny;
     }
+
+    // Previous tracking information
+    // this was previously done in openmc::geometry::find_cell_inner
+    // this is not useful since we are changing energy
+    // currentRay()->auxData(13) = p->sqrtkT();
+    // currentRay()->auxData(14) = p->material();
+
+    // Check for unsupported event
+    if (p->event() != openmc::TallyEvent::KILL && p->event() != openmc::TallyEvent::ABSORB &&
+        p->event() != openmc::TallyEvent::SCATTER)
+      mooseError("Unsupported event", int(p->event()));
 
     // Handle secondary particles immediately after they are sampled, as the particle
     // could change domain, and rays cannot be created in a different domain
-    p->alive() = false;
-    p->event_revive_from_secondary();
+    // p->alive() = false;
+    // p->event_revive_from_secondary();
+    // NOTE: event_revive_from_secondary is currently disabled in openmc
+    if (true)
+      return;
 
     // A secondary particle has been sampled
     // TODO: allow all particles, not just neutrons
@@ -269,37 +364,39 @@ CollisionKernel::onSegment()
       if (_is_2D)
       {
         start(2) = _z_coord;
-        direction(2) = 0;
+        currentRay()->auxData(9) = direction(2);
+        // direction(2) = 0;  // cant do that, must keep real direction
       }
-      std::shared_ptr<Ray> ray = acquireRay(start, direction);
+      std::shared_ptr<Ray> new_ray = acquireRay(start, direction);
 
       if (true)
         _console << "Sampled secondary particle type " << int(p->type()) << ", creating new ray "
-                 << ray->id() << " at " << p->r() << " " << p->E() << "eV " << std::endl;
+                 << new_ray->id() << " at " << p->r() << " " << p->E() << "eV " << std::endl;
 
       // Store neutron information
-      ray->auxData(0) = p->E();
-      ray->auxData(1) = p->wgt();
+      new_ray->auxData(0) = p->E();
+      new_ray->auxData(1) = p->wgt();
 
       // Reset number of progeny particles
-      ray->auxData(2) = 0;
+      new_ray->auxData(2) = 0;
 
       // Need to generate a new particle id
       // FIXME This is not deterministic
       // Particle id is used in event_death to track the number
       // of progeny per particle, then used for sorting the fission source
       openmc::Particle p2;
-      ray->auxData(3) = p2.id();
+      new_ray->auxData(3) = p2.id();
 
       // Keep track of the particle seed for consistent random number generation
-      ray->auxData(4) = p->seeds(0);
-      ray->auxData(5) = p->seeds(1);
-      ray->auxData(6) = p->seeds(2);
+      // TODO conversion of uint64
+      new_ray->auxData(4) = p->seeds(0);
+      new_ray->auxData(5) = p->seeds(1);
+      new_ray->auxData(6) = p->seeds(2);
 
       // Keep track of particle type
-      ray->auxData(7) = int(p->type());
+      new_ray->auxData(7) = int(p->type());
 
-      moveRayToBuffer(ray);
+      moveRayToBuffer(new_ray);
     }
   }
 }

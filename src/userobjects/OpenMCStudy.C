@@ -9,6 +9,7 @@
 
 // Local includes
 #include "OpenMCStudy.h"
+#include "MaCawUtils.h"
 
 // MOOSE includes
 #include "TimedPrint.h"
@@ -217,6 +218,14 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
   registerRayAuxData("seed_URR");
   registerRayAuxData("particle_type");
   registerRayAuxData("n_event"); // avoid max_event on threaded particles in kernel
+  registerRayAuxData("2d_out_of_plane_angle");
+  // Bad conversion between unsigned int and float
+  registerRayAuxData("seed_tracking_error");
+  registerRayAuxData("seed_source_error");
+  registerRayAuxData("seed_URR_error");
+  // Need to skip the same way openmc does
+  registerRayAuxData("sqrtkbT_last");
+  registerRayAuxData("material_last");
 
   // Set the number of steps of the Transient executioner as the number of batches
   if (dynamic_cast<Transient *>(_app.getExecutioner()))
@@ -268,14 +277,15 @@ OpenMCStudy::generateRays()
   // TODO Reinit the elements for the physics
 
   // Move the rays to the work buffers
-  for (auto & ray : _local_rays)
-  {
-    // TODO All the resetting because generateRays is called everytime
-    //  ray->resetCounters();
-    //  ray->clearStartingInfo();
+  // for (auto & ray : _local_rays)
+  // {
+  //   // TODO All the resetting because generateRays is called every time
+  //   //  ray->resetCounters();
+  //   //  ray->clearStartingInfo();
 
-    moveRayToBuffer(ray);
-  }
+  //   moveRayToBuffer(ray);
+  // }
+  moveRaysToBuffer(_local_rays);
 }
 
 void
@@ -305,6 +315,8 @@ OpenMCStudy::claimRaysInternal()
   TIME_SECTION(_claim_rays_timer);
 
   _claim_rays.claim();
+  if (_verbose)
+    _console << "Particles claimed by each process" << std::endl;
 }
 
 void
@@ -376,14 +388,35 @@ OpenMCStudy::defineRays()
     // Keep track of openmc particle id
     // particle id is rank_start_id + local_id
     ray->auxData(3) = p.id();
+    mooseAssert(ray->auxData(3) == p.id(), "Must be stored exactly");
 
     // Keep track of the particle seed for consistent random number generation
-    ray->auxData(4) = p.seeds(0);
-    ray->auxData(5) = p.seeds(1);
-    ray->auxData(6) = p.seeds(2);
+    if (_verbose)
+      std::cout << "Initialization seeds: " << p.seeds(0) << " " << p.seeds(1) << " " << p.seeds(2)
+                << std::endl;
+    Real round, diff;
+    MaCaw::convertInt64(p.seeds(0), round, diff);
+    ray->auxData(4) = round;
+    ray->auxData(10) = diff;
+    MaCaw::convertInt64(p.seeds(1), round, diff);
+    ray->auxData(5) = round;
+    ray->auxData(11) = diff;
+    MaCaw::convertInt64(p.seeds(2), round, diff);
+    ray->auxData(6) = round;
+    ray->auxData(12) = diff;
 
     // Keep track of particle type
     ray->auxData(7) = int(p.type());
+
+    // Initialize number of events
+    ray->auxData(8) = 0;
+
+    // Initialize 2D angle
+    ray->auxData(9) = p.u()[2];
+
+    // Initialize previous collision info
+    ray->auxData(13) = -300; // last sqrt(kbT)
+    ray->auxData(14) = -1;   // last material
 
     // Set starting information
     Point start(p.r()[0], p.r()[1], p.r()[2]);
@@ -403,6 +436,8 @@ OpenMCStudy::defineRays()
 
     _rays.emplace_back(std::move(ray));
   }
+  if (_verbose)
+    _console << "Rays defined" << std::endl;
 }
 
 void
@@ -420,15 +455,15 @@ OpenMCStudy::postExecuteStudy()
     _console << "Finalizing generations and batches" << std::endl;
 
   // Reduce global tallies, sort and distribute the fission bank
-  if (comm().size() <= 1)
-    openmc::finalize_generation();
-  else
-  {
-    // For domain decomposed Monte Carlo:
-    // we cannot synchronize the bank using OpenMC's synchronize_bank because some domains
-    // may have sampled 0 sites (no fissile material in domain for example)
-    finalizeGeneration();
-  }
+  // if (comm().size() <= 1)
+  //   openmc::finalize_generation();
+  // else
+  // {
+  // For domain decomposed Monte Carlo:
+  // we cannot synchronize the bank using OpenMC's synchronize_bank because some domains
+  // may have sampled 0 sites (no fissile material in domain for example)
+  finalizeGeneration();
+  // }
 
   // Stop openmc from reducing tallies across ranks (arrays are not the same size)
   openmc::mpi::n_procs = 1;
@@ -441,11 +476,14 @@ OpenMCStudy::postExecuteStudy()
   openmc::mpi::master = (processor_id() == 0);
 
   // Output k-effective since OpenMC output is silenced
-  _console << "Keff " << openmc::simulation::keff << " (" << openmc::simulation::keff_std
+  _console << "Keff " << openmc::simulation::keff << " std-dev: (" << openmc::simulation::keff_std
            << ") Local generation: "
            << openmc::simulation::keff_generation / openmc::settings::n_particles *
                   openmc::mpi::n_procs
            << std::endl;
+  if (_verbose)
+    _console << "Computed from " << openmc::simulation::k_col_abs << "/"
+             << openmc::simulation::k_col_tra << "/" << openmc::simulation::k_abs_tra << std::endl;
 }
 
 void
@@ -481,9 +519,18 @@ OpenMCStudy::finalizeGeneration()
     if (openmc::simulation::fission_bank.size() == 0)
       openmc::simulation::progeny_per_particle.clear();
 
-    // openmc::sort_fission_bank();
-    // sorting wont work: progeny_id on sites are 0-n_progeny for a particle, but particles,
-    // since they overlap in id, are storing sum_progeny in progeny_per_particle
+    // Examine progeny
+    int i = 0;
+    for (const auto progeny : progeny_per_particle)
+    {
+      std::cout << i++ << " " << progeny << std::endl;
+    }
+
+    // if (comm().size() <= 1)
+    //   openmc::sort_fission_bank();
+    // sorting wont work with domain decomposition: progeny_id on sites are 0-n_progeny for a
+    // particle, but particles, since they overlap in id, are storing sum_progeny in
+    // progeny_per_particle
 
     // Synchronize all fission banks to keep the same number of starting rays every batch
     synchronizeBanks();
