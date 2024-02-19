@@ -1,50 +1,30 @@
 [Mesh]
-  # [gmg]
-  #   type = CartesianMeshGenerator
-  #   dim = 3
-  #   ix = '1 1 1'
-  #   iy = '1 1 1'
-  #   iz = '1'
-  #   dx = '4 2 4'
-  #   dy = '4 2 4'
-  #   dz = 5
-  # []
-  # [center]
-  #   type = TransformGenerator
-  #   input = 'gmg'
-  #   transform = 'TRANSLATE'
-  #   vector_value = '-5 -5 -2.5'
-  # []
+  [gmg]
+    type = CartesianMeshGenerator
+    dim = 2
+    ix = '1 1 1'
+    iy = '1 1 1'
+    dx = '4 2 4'
+    dy = '4 2 4'
+  []
+  [center]
+    type = TransformGenerator
+    input = 'gmg'
+    transform = 'TRANSLATE'
+    vector_value = '-5 -5 0'
+  []
   # [gmg]
   #   type = GeneratedMeshGenerator
-  #   dim = 3
+  #   dim = 2
   #   nx = 5
   #   ny = 5
-  #   nz = 1
   #   xmin = -5
   #   ymin = -5
-  #   zmin = -2.5
   #   xmax = 5
   #   ymax = 5
-  #   zmax = 2.5
-  #   # elem_type = TET4
   # []
-  [gmg]
-    type = GeneratedMeshGenerator
-    dim = 3
-    nx = 5
-    ny = 5
-    nz = 1
-    xmin = -5
-    ymin = -5
-    zmin = -2.5
-    xmax = 5
-    ymax = 5
-    zmax = 2.5
-    # elem_type = TET4
-  []
   [add_infinite_z_pin]
-    input = gmg
+    input = center
     type = SubdomainBoundingBoxGenerator
     top_right = '1 1 100'
     bottom_left = '-1 -1 -100'
@@ -63,7 +43,7 @@
   order = CONSTANT
   family = MONOMIAL
   # This is the temperature default for OpenMC
-  initial_condition = 1293.6
+  initial_condition = 293.6
 []
 
 [AuxVariables/power]
@@ -76,12 +56,13 @@
   # moderator fuel
   materials = "20 19" # openmc material id
   # verbose = true
+  z_coord = 0
 []
 
 [RayBCs]
   [reflect]
     type = ReflectRayBC
-    boundary = 'back front top right left bottom'
+    boundary = 'top right left bottom'
   []
 []
 
@@ -89,6 +70,7 @@
   type = OpenMCStudy
 
   execute_on = TIMESTEP_END
+
   verbose = false
 
   # Needed to cache trace information for RayTracingMeshOutput

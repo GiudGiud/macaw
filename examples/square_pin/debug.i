@@ -1,50 +1,22 @@
 [Mesh]
-  # [gmg]
-  #   type = CartesianMeshGenerator
-  #   dim = 3
-  #   ix = '1 1 1'
-  #   iy = '1 1 1'
-  #   iz = '1'
-  #   dx = '4 2 4'
-  #   dy = '4 2 4'
-  #   dz = 5
-  # []
-  # [center]
-  #   type = TransformGenerator
-  #   input = 'gmg'
-  #   transform = 'TRANSLATE'
-  #   vector_value = '-5 -5 -2.5'
-  # []
-  # [gmg]
-  #   type = GeneratedMeshGenerator
-  #   dim = 3
-  #   nx = 5
-  #   ny = 5
-  #   nz = 1
-  #   xmin = -5
-  #   ymin = -5
-  #   zmin = -2.5
-  #   xmax = 5
-  #   ymax = 5
-  #   zmax = 2.5
-  #   # elem_type = TET4
-  # []
   [gmg]
-    type = GeneratedMeshGenerator
+    type = CartesianMeshGenerator
     dim = 3
-    nx = 5
-    ny = 5
-    nz = 1
-    xmin = -5
-    ymin = -5
-    zmin = -2.5
-    xmax = 5
-    ymax = 5
-    zmax = 2.5
-    # elem_type = TET4
+    ix = '1 1 1'
+    iy = '1 1 1'
+    iz = '1'
+    dx = '4 2 4'
+    dy = '4 2 4'
+    dz = 5
+  []
+  [center]
+    type = TransformGenerator
+    input = 'gmg'
+    transform = 'TRANSLATE'
+    vector_value = '-5 -5 -2.5'
   []
   [add_infinite_z_pin]
-    input = gmg
+    input = center
     type = SubdomainBoundingBoxGenerator
     top_right = '1 1 100'
     bottom_left = '-1 -1 -100'
@@ -66,16 +38,19 @@
   initial_condition = 1293.6
 []
 
-[AuxVariables/power]
-[]
-
-[RayKernels/collision]
-  type = CollisionKernel
-  temperature = temperature
-  blocks = "0 1"
-  # moderator fuel
-  materials = "20 19" # openmc material id
-  # verbose = true
+# [RayKernels/collision]
+#   type = CollisionKernel
+#   temperature = temperature
+#   blocks = "0 1"
+#   # moderator fuel
+#   materials = "20 19" # openmc material id
+#   # verbose = true
+# []
+[RayKernels]
+  [aa]
+    type = RayDistanceAux
+    variable = 'power'
+  []
 []
 
 [RayBCs]
@@ -86,22 +61,10 @@
 []
 
 [UserObjects/study]
-  type = OpenMCStudy
-
-  execute_on = TIMESTEP_END
-  verbose = false
-
-  # Needed to cache trace information for RayTracingMeshOutput
-  always_cache_traces = false
-  segments_on_cache_traces = false
-
-  # Needed to cache Ray data for RayTracingMeshOutput
-  data_on_cache_traces = false
-  aux_data_on_cache_traces = false
-
-  tolerate_failure = true
-  verify_rays = false
-  verify_trace_intersections = false
+  type = RepeatableRayStudy
+  names = 'ray1'
+  directions = ' 0.2944 -0.835218 -0.464478'
+  start_points = ' 1.92604       -5 0.405378'
 []
 
 [Executioner]
@@ -186,28 +149,28 @@
 ##############################################################################
 # Tallies
 
-[UserObjects]
-  [tally]
-    type = OpenMCTally
-    particle_type = 'neutron'
-    estimator = 'COLLISION'
-    scores = 'kappa-fission'
-    filters = 'cell'
-    execute_on = 'initial'
-    id = 1
-  []
-[]
+# [UserObjects]
+#   [tally]
+#     type = OpenMCTally
+#     particle_type = 'neutron'
+#     estimator = 'COLLISION'
+#     scores = 'kappa-fission'
+#     filters = 'cell'
+#     execute_on = 'initial'
+#     id = 1
+#   []
+# []
 
-[AuxKernels]
-  [cell_val]
-    type = OpenMCTallyAux
-    granularity = 'cell'
-    score = 'kappa-fission'
-    tally_id = 1
-    execute_on = TIMESTEP_END
-    variable = power
-  []
-[]
+# [AuxKernels]
+#   [cell_val]
+#     type = OpenMCTallyAux
+#     granularity = 'cell'
+#     score = 'kappa-fission'
+#     tally_id = 1
+#     execute_on = TIMESTEP_END
+#     variable = power
+#   []
+# []
 
 [AuxVariables]
   [power]

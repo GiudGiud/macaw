@@ -1,13 +1,20 @@
 <?xml version='1.0' encoding='utf-8'?>
 <geometry>
   <cell id="19" material="19" region="137 -138 139 -140 135 -136" universe="10" />
-  <cell id="20" material="20" region="131 -132 133 -134 135 -136 (-137 | 138 | -139 | 140)" universe="10" />
+  <cell id="20" material="20" region="138 -132 133 -139 135 -136" universe="10" />
+  <cell id="21" material="20" region="138 -132 139 -140 135 -136" universe="10" />
+  <cell id="22" material="20" region="138 -132 140 -134 135 -136" universe="10" />
+  <cell id="23" material="20" region="137 -138 133 -139 135 -136" universe="10" />
+  <cell id="24" material="20" region="137 -138 140 -134 135 -136" universe="10" />
+  <cell id="25" material="20" region="131 -137 133 -139 135 -136" universe="10" />
+  <cell id="26" material="20" region="131 -137 139 -140 135 -136" universe="10" />
+  <cell id="27" material="20" region="131 -137 140 -134 135 -136" universe="10" />
   <surface boundary="reflective" coeffs="-5" id="131" type="x-plane" />
   <surface boundary="reflective" coeffs="5" id="132" type="x-plane" />
   <surface boundary="reflective" coeffs="-5" id="133" type="y-plane" />
   <surface boundary="reflective" coeffs="5" id="134" type="y-plane" />
-  <surface boundary="reflective" coeffs="-5" id="135" type="z-plane" />
-  <surface boundary="reflective" coeffs="5" id="136" type="z-plane" />
+  <surface boundary="reflective" coeffs="-2.5" id="135" type="z-plane" />
+  <surface boundary="reflective" coeffs="2.5" id="136" type="z-plane" />
   <surface coeffs="-1" id="137" type="x-plane" />
   <surface coeffs="1" id="138" type="x-plane" />
   <surface coeffs="-1" id="139" type="y-plane" />
