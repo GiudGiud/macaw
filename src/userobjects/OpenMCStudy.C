@@ -520,11 +520,11 @@ OpenMCStudy::finalizeGeneration()
       openmc::simulation::progeny_per_particle.clear();
 
     // Examine progeny
-    int i = 0;
-    for (const auto progeny : progeny_per_particle)
-    {
-      std::cout << i++ << " " << progeny << std::endl;
-    }
+    // int i = 0;
+    // for (const auto progeny : progeny_per_particle)
+    // {
+    //   std::cout << i++ << " " << progeny << std::endl;
+    // }
 
     // if (comm().size() <= 1)
     //   openmc::sort_fission_bank();
