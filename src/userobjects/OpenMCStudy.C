@@ -178,6 +178,11 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
     openmc::model::cells[i] = gsl::make_unique<openmc::CSGCell>();
     openmc::model::cells[i]->id_ = elem_id;
     openmc::model::cells[i]->universe_ = univ_id;
+    // this should be index of the material for that block
+    // TODO: use extra element integer?
+    openmc::model::cells[i]->material_ = {0};
+    // This should the temperature of the cell
+    openmc::model::cells[i]->sqrtkT_ = {293};
     openmc::model::cell_map[elem_id] = elem_id;
 
     // Add all universes to the universe map, and keep track of the cells in each universe
@@ -196,8 +201,10 @@ OpenMCStudy::OpenMCStudy(const InputParameters & params)
   if (_verbose)
   {
     _console << "Estimated particles per rank " << openmc::simulation::work_per_rank << std::endl;
-    _console << "Universes/Blocks on rank " << processor_id() << " "
+    _console << "Universes/Blocks on rank " << processor_id() << ": "
              << openmc::model::universes.size() << std::endl;
+    _console << "Cells on rank " << processor_id() << ": " << openmc::model::cells.size()
+             << std::endl;
   }
 
   // This is used to index into arrays with [particle_id - work_index]
@@ -391,9 +398,10 @@ OpenMCStudy::defineRays()
     mooseAssert(ray->auxData(3) == p.id(), "Must be stored exactly");
 
     // Keep track of the particle seed for consistent random number generation
-    if (_verbose)
-      std::cout << "Initialization seeds: " << p.seeds(0) << " " << p.seeds(1) << " " << p.seeds(2)
-                << std::endl;
+    // if (_verbose)
+    //   std::cout << "Initialization seeds: " << p.seeds(0) << " " << p.seeds(1) << " " <<
+    //   p.seeds(2)
+    //             << std::endl;
     Real round, diff;
     MaCaw::convertInt64(p.seeds(0), round, diff);
     ray->auxData(4) = round;
@@ -476,14 +484,31 @@ OpenMCStudy::postExecuteStudy()
   openmc::mpi::master = (processor_id() == 0);
 
   // Output k-effective since OpenMC output is silenced
-  _console << "Keff " << openmc::simulation::keff << " std-dev: (" << openmc::simulation::keff_std
-           << ") Local generation: "
-           << openmc::simulation::keff_generation / openmc::settings::n_particles *
-                  openmc::mpi::n_procs
-           << std::endl;
-  if (_verbose)
-    _console << "Computed from " << openmc::simulation::k_col_abs << "/"
-             << openmc::simulation::k_col_tra << "/" << openmc::simulation::k_abs_tra << std::endl;
+  if (openmc::settings::run_mode == openmc::RunMode::EIGENVALUE)
+  {
+    _console << "Keff " << openmc::simulation::keff << " std-dev: (" << openmc::simulation::keff_std
+             << ") Local generation: "
+             << openmc::simulation::keff_generation / openmc::settings::n_particles *
+                    openmc::mpi::n_procs
+             << std::endl;
+    if (_verbose)
+      _console << "Computed from " << openmc::simulation::k_col_abs << "/"
+               << openmc::simulation::k_col_tra << "/" << openmc::simulation::k_abs_tra
+               << std::endl;
+  }
+  else if (openmc::settings::run_mode == openmc::RunMode::FIXED_SOURCE)
+  {
+    const auto n = openmc::simulation::n_realizations;
+    auto & gt = openmc::simulation::global_tallies;
+    const auto x = &gt(openmc::GlobalTally::LEAKAGE, 0);
+    double mean = x[static_cast<int>(openmc::TallyResult::SUM)] / n;
+    double stdev =
+        n > 1 ? std::sqrt(std::max(
+                    0.0,
+                    (x[static_cast<int>(openmc::TallyResult::SUM_SQ)] / n - mean * mean) / (n - 1)))
+              : 0.0;
+    _console << "Leakage " << mean << " +/- " << stdev << std::endl;
+  }
 }
 
 void

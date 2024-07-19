@@ -50,7 +50,7 @@ for num_proc in num_procs:
 
     # Create a region represented as the inside of a rectangular prism
     pitch = box_size
-    box = openmc.rectangular_prism(pitch, pitch, boundary_type='reflective')
+    box = openmc.model.rectangular_prism(pitch, pitch, boundary_type='reflective')
 
     # Create cells, mapping materials to regions
     water = openmc.Cell(fill=inf_medium, region=box)
